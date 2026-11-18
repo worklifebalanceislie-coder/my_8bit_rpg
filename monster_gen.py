@@ -8,26 +8,28 @@ from components.equipment import Equipment
 from components.stats import Stats
 from components.combat import Combat
 from components.ai import AIController
+from components.skills import SkillBook
+import json
+from sprites import PALETTE
 
-# Цветовые схемы мутаций: (Префикс, Основной цвет, Тень, Цвет глаз, Бонусы: hp, atk, def, speed)
-COLOR_VARIANTS = {
-    "goblin": [
-        ("Болотный", (95, 165, 60), (60, 110, 40), (220, 50, 50), {"hp": 0, "atk": 0, "def": 0, "spd": 0}),
-        ("Пещерный", (130, 115, 95), (85, 75, 60), (255, 210, 50), {"hp": 10, "atk": 1, "def": 1, "spd": -5}),
-        ("Кровавый", (185, 55, 55), (125, 35, 35), (255, 255, 255), {"hp": 15, "atk": 3, "def": 0, "spd": 10}),
-        ("Теневой", (75, 70, 105), (45, 40, 65), (120, 230, 255), {"hp": 5, "atk": 2, "def": 0, "spd": 15}),
-    ],
-    "skeleton": [
-        ("Древний", (215, 210, 195), (155, 150, 135), (220, 50, 50), {"hp": 0, "atk": 1, "def": 1, "spd": 0}),
-        ("Ледяной", (140, 210, 235), (85, 145, 175), (50, 100, 255), {"hp": 15, "atk": 1, "def": 2, "spd": -5}),
-        ("Проклятый", (145, 120, 165), (95, 75, 115), (100, 255, 100), {"hp": 20, "atk": 2, "def": 1, "spd": 5}),
-    ],
-    "slime": [
-        ("Лесной", (70, 190, 90), (40, 130, 60), (20, 20, 28), {"hp": 10, "atk": 0, "def": 1, "spd": -10}),
-        ("Огненный", (230, 100, 40), (170, 55, 20), (255, 240, 120), {"hp": 15, "atk": 3, "def": 0, "spd": 0}),
-        ("Ядовитый", (160, 70, 200), (105, 40, 140), (150, 255, 80), {"hp": 10, "atk": 2, "def": 1, "spd": 5}),
-    ]
-}
+
+
+COLOR_THEMES = [
+    ((85, 165, 65), (55, 115, 40), (240, 60, 60)),     # Болотный зеленый
+    ((185, 65, 65), (130, 40, 40), (255, 220, 70)),    # Багровый
+    ((75, 135, 205), (45, 90, 150), (140, 245, 255)),  # Ледяной синий
+    ((145, 85, 185), (100, 50, 135), (120, 255, 120)), # Ядовитый фиолетовый
+    ((205, 185, 145), (150, 130, 95), (255, 90, 50)),  # Костяной / Песчаный
+]
+
+MODIFIERS = [
+    ("Обычный", {"hp": 0, "atk": 0, "spd": 0}),
+    ("Дикий", {"hp": 5, "atk": 2, "spd": 10}),
+    ("Бронированный", {"hp": 15, "atk": 0, "spd": -8}),
+    ("Свирепый", {"hp": 10, "atk": 3, "spd": 5}),
+    ("Древний", {"hp": 25, "atk": 4, "spd": -5}),
+]
+
 
 # Запчасти 16x16: 'K' - контур, '1' - основной цвет, '2' - тень, 'E' - глаза, 'B' - кость/рога/зубы, 'A' - одежда/броня
 PARTS = {
@@ -149,81 +151,134 @@ PARTS = {
     ],
 }
 
-def assemble_monster_sprite(part_names, main_color, shade_color, eye_color):
-    """Накладывает выбранные запчасти друг на друга и красит в нужный подвид"""
+def assemble_monster_sprite(part_keys, body_c, dark_c, eye_c):
     surf = pygame.Surface((16, 16), pygame.SRCALPHA)
-    local_palette = {
-        'K': (20, 20, 28),
-        '1': main_color,
-        '2': shade_color,
-        'E': eye_color,
-        'B': (225, 215, 185),  # Кости / рога / пояс
-        'A': (105, 65, 40),    # Лохмотья / кожа
+    custom_pal = dict(PALETTE)
+    custom_pal["M"] = body_c
+    custom_pal["m"] = dark_c
+    custom_pal["B"] = body_c
+    custom_pal["b"] = dark_c
+    custom_pal["E"] = eye_c
+
+    fallback = {
+        "body_ribcage": [
+            "................", "................", "................", "................",
+            "................", "................", ".....MMMMMM.....", "....M.MMMM.M....",
+            "...M..mMMm..M...", "...M..MMMM..M...", ".....mMMMMm.....", ".....MM..MM.....",
+            ".....mm..mm.....", "....MMM..MMM....", "................", "................"
+        ],
+        "head_skull": [
+            "................", ".....MMMMMM.....", "....MMMMMMMM....", "....MMEmmEMM....",
+            "....MMMMMMMM....", ".....MmMmMm.....", "................", "................",
+            "................", "................", "................", "................",
+            "................", "................", "................", "................"
+        ]
     }
-    for part_key in part_names:
-        matrix = PARTS[part_key]
-        for y, row in enumerate(matrix):
-            for x, char in enumerate(row):
-                color = local_palette.get(char)
-                if color:
-                    surf.set_at((x, y), color)
+
+    for key in part_keys:
+        matrix = PARTS.get(key) or fallback.get(key)
+        if not matrix:
+            continue
+        for r_idx, row in enumerate(matrix[:16]):
+            for c_idx, ch in enumerate(row[:16]):
+                col = custom_pal.get(ch)
+                if col:
+                    surf.set_at((c_idx, r_idx), col)
     return surf
 
-def generate_monster(x, y, sprite_bank):
-    """Генерирует тематически согласованного уникального монстра"""
-    archetype = random.choice(["goblin", "skeleton", "slime"])
-    prefix, c_main, c_shade, c_eye, bonus = random.choice(COLOR_VARIANTS[archetype])
 
-    if archetype == "goblin":
-        head = random.choice(["head_goblin", "head_goblin_horned"])
-        body = "body_rags"
-        base_name = "Гоблин-вождь" if "horned" in head else "Гоблин"
-        parts = [body, head]
-        base_hp, base_atk, base_def, base_spd = 40, 4, 0, 45
+def generate_monster(x, y, sprite_bank, db=None):
+    """Собирает уникального монстра из таблиц monster_archetypes и monster_parts базы данных"""
+    archetypes_list = []
+    parts_by_arch = {}
 
-    elif archetype == "skeleton":
-        head = random.choice(["head_skull", "head_skull_crown"])
-        body = "body_ribcage"
-        base_name = "Король скелетов" if "crown" in head else "Скелет"
-        parts = [body, head]
-        base_hp, base_atk, base_def, base_spd = 45, 5, 1, 40
+    if db is not None:
+        cur = db.conn.cursor()
+        cur.execute("SELECT * FROM monster_archetypes")
+        archetypes_list = [dict(r) for r in cur.fetchall()]
 
-    else:  # slime
-        body = random.choice(["slime_round", "slime_spiky"])
-        base_name = "Шипастый слизень" if "spiky" in body else "Слизень"
-        parts = [body]
-        base_hp, base_atk, base_def, base_spd = 55, 4, 1, 30
+        cur.execute("SELECT * FROM monster_parts")
+        for r in cur.fetchall():
+            arch = r["archetype"]
+            parts_by_arch.setdefault(arch, {"body": [], "head": []})
+            parts_by_arch[arch][r["part_type"]].append(json.loads(r["art_matrix"]))
 
-    full_name = f"{prefix} {base_name.lower()}"
-    sprite = assemble_monster_sprite(parts, c_main, c_shade, c_eye)
+    # Запасной вариант, если БД не передана
+    if not archetypes_list:
+        archetypes_list = [
+            {"id": "goblin", "name_ru": "Гоблин", "base_hp": 30, "base_atk": 3, "speed": 45, "faction": "monster", "possible_skills": '["volley", "whirlwind"]'},
+            {"id": "skeleton", "name_ru": "Скелет", "base_hp": 35, "base_atk": 4, "speed": 42, "faction": "undead", "possible_skills": '["ice_bolt", "heal_spell"]'},
+            {"id": "slime", "name_ru": "Слизень", "base_hp": 42, "base_atk": 2, "speed": 35, "faction": "monster", "possible_skills": '["passive_skin"]'},
+        ]
 
-    # Создаем сущность с модулями
-    mob = Entity(full_name, x, y, c_main, sprite=sprite, faction="monster", sprite_bank=sprite_bank)
-    mob.movement = Movement(mob, speed=max(20, base_spd + bonus["spd"]))
-    mob.inventory = Inventory(capacity=6, gold=random.randint(15, 50))
+    arch_data = random.choice(archetypes_list)
+    arch_id = arch_data["id"]
+    base_name = arch_data["name_ru"]
+    base_hp = arch_data["base_hp"]
+    base_atk = arch_data["base_atk"]
+    base_speed = arch_data["speed"]
+    faction = arch_data["faction"]
+    possible_skills = json.loads(arch_data["possible_skills"]) if isinstance(arch_data["possible_skills"], str) else arch_data["possible_skills"]
+
+    mod_name, bonus = random.choice(MODIFIERS)
+    full_name = f"{mod_name} {base_name}"
+
+    arch_parts = parts_by_arch.get(arch_id, {})
+    bodies = arch_parts.get("body", [])
+    heads = arch_parts.get("head", [])
+
+    if bodies:
+        chosen_layers = [random.choice(bodies)]
+        if heads:
+            chosen_layers.append(random.choice(heads))
+        # Собираем спрайт из выбранных матриц
+        surf = pygame.Surface((16, 16), pygame.SRCALPHA)
+        body_c, dark_c, eye_c = random.choice(COLOR_THEMES)
+        custom_pal = dict(PALETTE)
+        custom_pal["M"] = body_c
+        custom_pal["m"] = dark_c
+        custom_pal["B"] = body_c
+        custom_pal["b"] = dark_c
+        custom_pal["E"] = eye_c
+
+        for matrix in chosen_layers:
+            for r_idx, row in enumerate(matrix[:16]):
+                for c_idx, ch in enumerate(row[:16]):
+                    col = custom_pal.get(ch)
+                    if col:
+                        surf.set_at((c_idx, r_idx), col)
+        spr = surf
+    else:
+        spr = sprite_bank.get("goblin")
+
+    mob = Entity(full_name, x, y, (180, 70, 70), sprite=spr, faction=faction, sprite_bank=sprite_bank)
+    mob.movement = Movement(mob, speed=max(25, base_speed + bonus["spd"]))
+    mob.inventory = Inventory(capacity=6, gold=random.randint(10, 45))
     mob.equipment = Equipment()
     mob.stats = Stats(
         hp=base_hp + bonus["hp"],
-        mp=20,
-        str_val=base_atk + bonus["atk"],
-        agi_val=base_atk + bonus["atk"],
-        end_val=base_def + bonus["def"]
+        mp=30,
+        str_val=max(1, base_atk + bonus["atk"]),
+        agi_val=max(1, base_atk + bonus["atk"]),
+        int_val=max(1, base_atk + bonus["atk"]),
+        end_val=1 if mod_name == "Бронированный" else 0
     )
-
-    mob.combat = Combat(mob, cooldown=0.75)
-    mob.ai = AIController(mob, role="monster", aggro_radius=90)
+    mob.combat = Combat(mob, cooldown=0.8)
+    mob.ai = AIController(mob, role="monster", aggro_radius=115)
+    mob.skills = SkillBook(mob, max_slots=4)
     mob.link_components()
 
-    # Выдаем тематический лут и оружие (гуманоидам - мечи, слизням - самоцветы и зелья)
-    if archetype in ("goblin", "skeleton"):
-        weapon_choice = random.choice(["rusty_sword", "rusty_sword", "iron_sword"])
-        mob.inventory.add_item(ITEMS_DB[weapon_choice])
-        if random.random() < 0.4:
-            mob.inventory.add_item(ITEMS_DB["leather_armor"])
-    else:
-        mob.inventory.add_item(ITEMS_DB["gem"])
+    if possible_skills:
+        k_count = min(len(possible_skills), random.randint(1, 2))
+        for sk_id in random.sample(possible_skills, k=k_count):
+            mob.skills.learn_skill(sk_id)
 
-    if random.random() < 0.6:
-        mob.inventory.add_item(ITEMS_DB["potion"])
+    if arch_id == "goblin":
+        mob.inventory.add_item(ITEMS_DB["hunting_bow"] if random.random() < 0.6 else ITEMS_DB["rusty_sword"])
+    elif arch_id == "skeleton":
+        mob.inventory.add_item(ITEMS_DB["iron_sword"] if random.random() < 0.5 else ITEMS_DB["fire_staff"])
+    else:
+        mob.inventory.add_item(ITEMS_DB["potion"] if random.random() < 0.5 else ITEMS_DB["gem"])
 
     return mob
+

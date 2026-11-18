@@ -1,5 +1,5 @@
 class Item:
-    def __init__(self, item_id, name, item_type, value, stats_bonus=None, description="", combat_style="melee", skill_id=None):
+    def __init__(self, item_id, name, item_type, value, stats_bonus=None, description="", combat_style="melee", skill_id=None, sprite_key=None):
         self.id = item_id
         self.name = name
         self.type = item_type
@@ -8,6 +8,8 @@ class Item:
         self.description = description
         self.combat_style = combat_style
         self.skill_id = skill_id
+        self.sprite_key = sprite_key
+
 
     def get_stats_text(self):
         if self.type == "book":
@@ -57,4 +59,23 @@ ITEMS_DB = {
     "book_blade": Item("book_blade", "Книга: Мастер клинка", "book", 65, {}, "Пассивный: +50% от Силы к урону в ближнем бою.", skill_id="passive_blade"),
     "book_skin": Item("book_skin", "Книга: Каменная кожа", "book", 65, {}, "Пассивный: +50% от Стойкости к защите.", skill_id="passive_skin"),
     "book_mana": Item("book_mana", "Книга: Поток маны", "book", 60, {}, "Пассивный: ускоряет регенерацию маны от Интеллекта.", skill_id="passive_mana"),
+        # ЭССЕНЦИИ НАВЫКОВ (Выпадают с побежденных мобов и бойцов)
+    "essence_whirlwind": Item("essence_whirlwind", "Эссенция: Вихрь клинка", "book", 45, {}, "Сгусток боевой энергии. Изучает навык 'Вихрь клинка'.", skill_id="whirlwind"),
+    "essence_volley": Item("essence_volley", "Эссенция: Залп стрел", "book", 45, {}, "Сгусток энергии ветра. Изучает навык 'Залп стрел'.", skill_id="volley"),
+    "essence_ice": Item("essence_ice", "Эссенция: Ледяная стрела", "book", 50, {}, "Морозный кристалл души. Изучает навык 'Ледяная стрела'.", skill_id="ice_bolt"),
+    "essence_heal": Item("essence_heal", "Эссенция: Исцеление", "book", 45, {}, "Светлая сфера жизни. Изучает навык 'Свет исцеления'.", skill_id="heal_spell"),
+    "essence_blade": Item("essence_blade", "Эссенция: Мастер клинка", "book", 55, {}, "Осколок мастерства. Изучает пассивку 'Мастер клинка'.", skill_id="passive_blade"),
+    "essence_skin": Item("essence_skin", "Эссенция: Каменная кожа", "book", 55, {}, "Каменное ядро. Изучает пассивку 'Каменная кожа'.", skill_id="passive_skin"),
+    "essence_mana": Item("essence_mana", "Эссенция: Поток маны", "book", 50, {}, "Магический сгусток. Изучает пассивку 'Поток маны'.", skill_id="passive_mana"),
 }
+
+SKILL_TO_ESSENCE = {
+    "whirlwind": "essence_whirlwind",
+    "volley": "essence_volley",
+    "ice_bolt": "essence_ice",
+    "heal_spell": "essence_heal",
+    "passive_blade": "essence_blade",
+    "passive_skin": "essence_skin",
+    "passive_mana": "essence_mana",
+}
+

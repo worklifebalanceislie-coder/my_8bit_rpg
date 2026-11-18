@@ -63,9 +63,13 @@ class Stats:
     def get_def(self):
         bonus = self.equipment.get_total_bonus("def") if self.equipment else 0
         total = self.end + bonus
-        if self.skills and self.skills.has_skill("passive_skin"):
-            total += self.end // 2
+        if self.skills:
+            if self.skills.has_skill("passive_skin"):
+                total += self.end // 2
+            if self.skills.has_skill("race_human"):
+                total += 1
         return total
+
 
 
     def roll_damage(self, raw_atk, target_def):
@@ -84,12 +88,15 @@ class Stats:
             self.mp = min(float(self.max_mp), self.mp + self.mp_regen * dt)
 
     def gain_xp(self, amount):
+        if self.skills and self.skills.has_skill("race_human"):
+            amount = int(amount * 1.2)
         leveled_up = False
         self.xp += amount
         while self.xp >= self.xp_to_next:
             self.level_up()
             leveled_up = True
         return leveled_up
+
 
     def level_up(self):
         self.xp -= self.xp_to_next

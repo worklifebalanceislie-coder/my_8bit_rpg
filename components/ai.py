@@ -2,16 +2,10 @@ import random
 import math
 from components.trade import Trade
 from components.pathfinding import find_path
-
+from factions import are_hostile
 
 class AIController:
-    def __init__(self, owner, role="merchant", aggro_radius=85):
-        self.projectiles = None
-        self.last_pos = None
-        self.stuck_timer = 0.0
-        self.path = []
-        self.path_timer = 0.0
-        self.path_goal = None
+    def __init__(self, owner, role="merchant", aggro_radius=95):
         self.owner = owner
         self.role = role
         self.aggro_radius = aggro_radius
@@ -20,17 +14,22 @@ class AIController:
         self.dir_y = 0
         self.personal_enemies = set()
         self.trade_cooldown = 0.0
+        self.path = []
+        self.path_timer = 0.0
+        self.path_goal = None
+        self.last_pos = None
+        self.stuck_timer = 0.0
+        self.world = None
 
-    def update(self, dt, walls, entities=None, projectiles=None):
-        if not entities:
-            entities = []
-        if projectiles is not None:
-            self.projectiles = projectiles
+    def update(self, dt, world):
+        self.world = world
+        entities = world.entities
+        walls = world.walls
 
         if self.trade_cooldown > 0:
-            if self.path_timer > 0:
-                self.path_timer -= dt
             self.trade_cooldown -= dt
+        if self.path_timer > 0:
+            self.path_timer -= dt
 
         self.manage_gear()
         self.manage_healing()
@@ -44,7 +43,7 @@ class AIController:
                 if self.role == "merchant":
                     self.owner.say("Стража! Помогите!")
                     for ent in entities:
-                        if ent.ai and ent.ai.role == "guard" and self.distance_to(ent) < 150:
+                        if ent.ai and ent.ai.role == "guard" and self.distance_to(ent) < 160:
                             ent.ai.personal_enemies.add(attacker)
                             ent.say("Иду на помощь!")
                 elif self.role == "guard":
@@ -64,12 +63,10 @@ class AIController:
             self.behave_monster(dt, walls, entities)
 
     def get_item_score(self, item):
-        return item.stats_bonus.get("atk", 0) + item.stats_bonus.get("def", 0)
+        return item.stats_bonus.get("atk", 0) + item.stats_bonus.get("def", 0) + item.stats_bonus.get("capacity", 0)
 
     def manage_gear(self):
-        if self.role == "merchant":
-            return
-        if not (self.owner.inventory and self.owner.equipment):
+        if self.role == "merchant" or not (self.owner.inventory and self.owner.equipment):
             return
         for item in list(self.owner.inventory.items):
             if item.type in self.owner.equipment.slots:
@@ -77,8 +74,17 @@ class AIController:
                 if current is None or self.get_item_score(item) > self.get_item_score(current):
                     self.owner.equipment.equip(item, self.owner.inventory)
 
-
     def manage_healing(self):
+        if not (self.owner.stats and self.owner.inventory):
+            return
+        if self.owner.stats.hp < self.owner.stats.max_hp * 0.45:
+            for item in list(self.owner.inventory.items):
+                if item.type == "consumable" and "heal" in item.stats_bonus:
+                    heal = item.stats_bonus["heal"]
+                    self.owner.stats.hp = min(float(self.owner.stats.max_hp), self.owner.stats.hp + heal)
+                    self.owner.inventory.remove_item(item)
+                    self.owner.say(f"+{heal} HP")
+                    break
         if self.owner.stats.mp < 15:
             for item in list(self.owner.inventory.items):
                 if item.type == "consumable" and "mana" in item.stats_bonus:
@@ -88,17 +94,6 @@ class AIController:
                     self.owner.say(f"+{mana} MP")
                     break
 
-        if not (self.owner.stats and self.owner.inventory):
-            return
-        if self.owner.stats.hp < self.owner.stats.max_hp * 0.45:
-            for item in list(self.owner.inventory.items):
-                if item.type == "consumable" and "heal" in item.stats_bonus:
-                    heal = item.stats_bonus["heal"]
-                    self.owner.stats.hp = min(self.owner.stats.max_hp, self.owner.stats.hp + heal)
-                    self.owner.inventory.remove_item(item)
-                    self.owner.say(f"+{heal} HP")
-                    break
-    
     def manage_level_up(self):
         if not self.owner.stats:
             return
@@ -106,7 +101,15 @@ class AIController:
             choice = random.choice(["str", "agi", "int", "vit", "end"])
             self.owner.stats.upgrade_stat(choice)
 
-
+    def manage_books(self):
+        if self.role == "merchant" or not (self.owner.inventory and self.owner.skills):
+            return
+        for item in list(self.owner.inventory.items):
+            if item.type == "book" and item.skill_id:
+                ok, _ = self.owner.skills.learn_skill(item.skill_id)
+                if ok:
+                    self.owner.inventory.remove_item(item)
+                    self.owner.say(f"Изучил: {item.name}!")
     def distance_to(self, target):
         return math.hypot(target.rect.centerx - self.owner.rect.centerx, target.rect.centery - self.owner.rect.centery)
 
@@ -119,18 +122,13 @@ class AIController:
         ox, oy = self.owner.rect.center
         dist_direct = math.hypot(gx - ox, gy - oy)
 
-        # Детектор застревания: если за 0.3 сек сдвинулись меньше чем на 1 пиксель
         if self.last_pos is not None:
             lx, ly = self.last_pos
             moved = math.hypot(ox - lx, oy - ly)
-            if moved < 0.5:
-                self.stuck_timer += dt
-            else:
-                self.stuck_timer = 0.0
+            self.stuck_timer = (self.stuck_timer + dt) if moved < 0.5 else 0.0
         self.last_pos = (ox, oy)
 
         if self.stuck_timer > 0.3:
-            # Выравниваем персонажа в центр текущей свободной клетки, чтобы отлипнуть от угла
             cell_cx = (ox // 16) * 16 + 8
             cell_cy = (oy // 16) * 16 + 8
             dx, dy = cell_cx - ox, cell_cy - oy
@@ -141,22 +139,21 @@ class AIController:
             self.stuck_timer = 0.0
             return
 
-        # Если цель вплотную (меньше 1 тайла), идем напрямую
         if dist_direct <= 14:
             if dist_direct > 0:
                 self.owner.movement.move((gx - ox) / dist_direct, (gy - oy) / dist_direct, dt, walls)
             return
 
-        # Пересчет пути A* каждые 0.25 сек
         if self.path_timer <= 0 or not self.path or self.path_goal != goal_pos:
             self.path_timer = 0.25
             self.path_goal = goal_pos
-            self.path = find_path((ox, oy), goal_pos, walls)
+            mw = self.world.width if self.world else 640
+            mh = self.world.height if self.world else 400
+            self.path = find_path((ox, oy), goal_pos, walls, mw, mh)
 
         if self.path:
             nx, ny = self.path[0]
-            dx = nx - ox
-            dy = ny - oy
+            dx, dy = nx - ox, ny - oy
             dist = math.hypot(dx, dy)
             if dist < 4:
                 self.path.pop(0)
@@ -164,18 +161,6 @@ class AIController:
                 self.owner.movement.move(dx / dist, dy / dist, dt, walls)
         elif dist_direct > 0:
             self.owner.movement.move((gx - ox) / dist_direct, (gy - oy) / dist_direct, dt, walls)
-
-    def manage_books(self):
-        if self.role == "merchant" or not (self.owner.inventory and self.owner.skills):
-            return
-        for item in list(self.owner.inventory.items):
-            if item.type == "book" and item.skill_id:
-                ok, _ = self.owner.skills.learn_skill(item.skill_id)
-                if ok:
-                    self.owner.inventory.remove_item(item)
-                    self.owner.say(f"Изучил: {item.name}!")
-
-
 
     def flee_from(self, threat, dt, walls):
         if not self.owner.movement:
@@ -199,23 +184,21 @@ class AIController:
     def engage_enemy(self, enemy, dt, walls):
         dist = self.distance_to(enemy)
 
-        if self.owner.skills:
+        if self.owner.skills and self.world:
             actives = self.owner.skills.get_active_skills()
             for idx, sk in enumerate(actives):
                 if sk.timer <= 0 and self.owner.stats.mp >= sk.mana_cost:
                     if sk.id == "heal_spell" and self.owner.stats.hp < self.owner.stats.max_hp * 0.6:
-                        self.owner.skills.use_active_slot(idx, [enemy], self.projectiles, walls)
+                        self.owner.skills.use_active_slot(idx, self.world)
                         return
                     elif sk.id == "whirlwind" and dist <= 22:
-                        self.owner.skills.use_active_slot(idx, [enemy], self.projectiles, walls)
+                        self.owner.skills.use_active_slot(idx, self.world)
                         return
                     elif sk.id in ("volley", "ice_bolt") and dist <= 110:
-                        self.owner.skills.use_active_slot(idx, [enemy], self.projectiles, walls, aim_pos=enemy.rect.center)
+                        self.owner.skills.use_active_slot(idx, self.world, aim_pos=enemy.rect.center)
                         return
 
         style = self.owner.combat.get_weapon_style() if self.owner.combat else "melee"
-        dist = self.distance_to(enemy)
-
         if style in ("bow", "staff"):
             if dist < 45 and self.owner.movement:
                 self.flee_from(enemy, dt, walls)
@@ -223,8 +206,8 @@ class AIController:
                 self.move_towards(enemy, dt, walls)
             else:
                 self.owner.facing_left = (enemy.rect.centerx < self.owner.rect.centerx)
-                if self.owner.combat:
-                    self.owner.combat.attack([enemy], self.projectiles, aim_pos=enemy.rect.center, walls=walls)
+                if self.owner.combat and self.world:
+                    self.owner.combat.attack(self.world, aim_pos=enemy.rect.center)
             return
 
         offset_x = 12 if self.owner.rect.centerx >= enemy.rect.centerx else -12
@@ -236,10 +219,8 @@ class AIController:
             self.move_towards((target_x, target_y), dt, walls)
         else:
             self.owner.facing_left = (enemy.rect.centerx < self.owner.rect.centerx)
-            if self.owner.combat:
-                self.owner.combat.attack([enemy], walls=walls)
-
-
+            if self.owner.combat and self.world:
+                self.owner.combat.attack(self.world)
 
     def has_junk_to_sell(self):
         if not self.owner.inventory:
@@ -247,7 +228,7 @@ class AIController:
         for item in self.owner.inventory.items:
             if item.type == "misc":
                 return True
-            if item.type in ("weapon", "armor") and self.owner.equipment:
+            if item.type in ("weapon", "armor", "backpack") and self.owner.equipment:
                 eq = self.owner.equipment.slots.get(item.type)
                 if eq and self.get_item_score(item) <= self.get_item_score(eq):
                     return True
@@ -257,7 +238,7 @@ class AIController:
         if not (merchant.inventory and self.owner.inventory):
             return None
         for item in merchant.inventory.items:
-            if item.type in ("weapon", "armor") and self.owner.inventory.gold >= item.value:
+            if item.type in ("weapon", "armor", "backpack") and self.owner.inventory.gold >= item.value:
                 eq = self.owner.equipment.slots.get(item.type) if self.owner.equipment else None
                 if self.get_item_score(item) > (self.get_item_score(eq) if eq else 0):
                     return item
@@ -273,7 +254,7 @@ class AIController:
         self.trade_cooldown = 0.8
         for item in list(self.owner.inventory.items):
             is_junk = (item.type == "misc")
-            if item.type in ("weapon", "armor") and self.owner.equipment:
+            if item.type in ("weapon", "armor", "backpack") and self.owner.equipment:
                 eq = self.owner.equipment.slots.get(item.type)
                 if eq and self.get_item_score(item) <= self.get_item_score(eq):
                     is_junk = True
@@ -304,26 +285,27 @@ class AIController:
                 if self.distance_to(ent) < 130 and ent.last_attacker not in self.personal_enemies:
                     self.personal_enemies.add(ent.last_attacker)
                     self.owner.say("Защитить горожан!")
-        target = self.find_closest_enemy(entities, 160 if self.personal_enemies else self.aggro_radius, True)
+        target = self.find_closest_enemy(entities, 180 if self.personal_enemies else self.aggro_radius, True)
         if target:
             self.engage_enemy(target, dt, walls)
         else:
             self.wander(dt, walls)
 
     def behave_adventurer(self, dt, walls, entities):
-        target = self.find_closest_enemy(entities, 140 if self.personal_enemies else self.aggro_radius, True)
+        target = self.find_closest_enemy(entities, 160 if self.personal_enemies else self.aggro_radius, True)
         if target:
             self.engage_enemy(target, dt, walls)
             return
 
         loot_target = None
-        best_dist = 110
+        best_dist = 240
         has_space = len(self.owner.inventory.items) < self.owner.inventory.capacity
         for ent in entities:
-            if ent.is_container and getattr(ent, "owner_lock", 0) <= 0 and ent.inventory and (ent.inventory.gold > 0 or (ent.inventory.items and has_space)):
-                d = self.distance_to(ent)
-                if d < best_dist:
-                    best_dist, loot_target = d, ent
+            if ent.is_container and getattr(ent, "owner_lock", 0) <= 0 and ent.inventory:
+                if ent.inventory.gold > 0 or (ent.inventory.items and has_space):
+                    d = self.distance_to(ent)
+                    if d < best_dist:
+                        best_dist, loot_target = d, ent
 
         if loot_target:
             if self.distance_to(loot_target) > 15:
@@ -357,14 +339,14 @@ class AIController:
         else:
             self.wander(dt, walls)
 
-    def find_closest_enemy(self, entities, radius, only_monsters_and_personal):
+    def find_closest_enemy(self, entities, radius, only_monsters_and_personal=False):
         target, best_dist = None, radius
         for ent in entities:
             if ent is self.owner or not ent.stats or ent.stats.hp <= 0:
                 continue
-            is_enemy = (ent.faction == "monster" or ent in self.personal_enemies) if only_monsters_and_personal else (ent.faction != "monster")
-            if is_enemy:
+            if are_hostile(self.owner, ent):
                 d = self.distance_to(ent)
                 if d < best_dist:
                     best_dist, target = d, ent
         return target
+

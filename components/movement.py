@@ -18,6 +18,9 @@ class Movement:
         self.is_moving = False
 
     def move(self, dx, dy, dt, walls):
+        if getattr(self.owner, "effects", None):
+            dt *= self.owner.effects.get_speed_multiplier()
+
         if dx == 0 and dy == 0:
             return
 

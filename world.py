@@ -10,22 +10,17 @@ class Camera:
         self.offset_y = 0
 
     def follow(self, target):
-        # Центрируем камеру на игроке
         x = target.rect.centerx - NATIVE_WIDTH // 2
         y = target.rect.centery - NATIVE_HEIGHT // 2
-
-        # Ограничиваем камеру границами карты
-        x = max(0, min(self.map_width - NATIVE_WIDTH, x))
-        y = max(0, min(self.map_height - NATIVE_HEIGHT, y))
-
-        self.offset_x = int(x)
-        self.offset_y = int(y)
+        self.offset_x = int(max(0, min(self.map_width - NATIVE_WIDTH, x)))
+        self.offset_y = int(max(0, min(self.map_height - NATIVE_HEIGHT, y)))
 
     def apply_rect(self, rect):
         return rect.move(-self.offset_x, -self.offset_y)
 
     def apply_pos(self, pos):
-        return (pos - self.offset_x, pos - self.offset_y)
+        px, py = pos
+        return (px - self.offset_x, py - self.offset_y)
 
 
 class WorldMap:
@@ -35,17 +30,17 @@ class WorldMap:
         self.width = cols * TILE_SIZE
         self.height = rows * TILE_SIZE
         self.tiles = [["grass" for _ in range(cols)] for _ in range(rows)]
-        self.walls = []          # Все непроходимые препятствия (стены + вода)
-        self.building_plots = [] # Размеченные площадки под будущие здания
+        self.walls = []
+        self.building_plots = []
+        self.entities = []
+        self.projectiles = []
         self.build_town_square()
 
     def build_town_square(self):
-        # 1. Заливаем всё травой
         for r in range(self.rows):
             for c in range(self.cols):
                 self.tiles[r][c] = "grass"
 
-        # 2. Небольшое живописное озерцо с песчаным берегом в правом нижнем секторе
         lake_cx, lake_cy = 30, 17
         for r in range(self.rows):
             for c in range(self.cols):
@@ -55,13 +50,11 @@ class WorldMap:
                 elif dist < 4.6:
                     self.tiles[r][c] = "sand"
 
-        # 3. Центральная площадь из брусчатки (в центре-слева)
         for r in range(6, 16):
             for c in range(8, 22):
                 if self.tiles[r][c] != "water":
                     self.tiles[r][c] = "cobble"
 
-        # 4. Земляные дороги (от площади к озеру, на юг и на восток)
         for c in range(13, 17):
             for r in range(16, self.rows - 1):
                 if self.tiles[r][c] == "grass":
@@ -71,10 +64,7 @@ class WorldMap:
                 if self.tiles[r][c] == "grass":
                     self.tiles[r][c] = "dirt"
 
-        # 5. Места под здания (фундаменты из земли/брусчатки по краям площади)
-        # Место под Таверну (слева сверху)
         self.building_plots.append(pygame.Rect(3 * TILE_SIZE, 3 * TILE_SIZE, 5 * TILE_SIZE, 3 * TILE_SIZE))
-        # Место под Лавку кузнеца / торговца (справа сверху от площади)
         self.building_plots.append(pygame.Rect(23 * TILE_SIZE, 3 * TILE_SIZE, 5 * TILE_SIZE, 3 * TILE_SIZE))
 
         for plot in self.building_plots:
@@ -84,7 +74,7 @@ class WorldMap:
                 for c in range(c1, c2):
                     self.tiles[r][c] = "dirt"
 
-        # 6. Каменные стены по периметру карты + препятствия (вода)
+        # Каменные стены по периметру
         for c in range(self.cols):
             self.tiles[0][c] = "wall"
             self.tiles[self.rows - 1][c] = "wall"
@@ -92,15 +82,59 @@ class WorldMap:
             self.tiles[r][0] = "wall"
             self.tiles[r][self.cols - 1] = "wall"
 
-        # Собираем все непроходимые хитбоксы (стены и вода)
+
         self.walls = []
         for r in range(self.rows):
             for c in range(self.cols):
                 if self.tiles[r][c] in ("wall", "water"):
                     self.walls.append(pygame.Rect(c * TILE_SIZE, r * TILE_SIZE, TILE_SIZE, TILE_SIZE))
 
-    def draw(self, surface, sprites, camera, font=None):
-        # Рисуем только те тайлы, которые попадают в объектив камеры
+    def populate_town_square(self, sprites, player, db):
+        """Заселяет площадь сущностями напрямую из таблицы npc_templates в БД"""
+        player.respawn()
+        npc_list = db.spawn_location_entities("town_square", sprites)
+        self.entities = [player] + npc_list
+
+    def update(self, dt, player, ui, loot_sprite):
+        event_msg = None
+
+        for ent in list(self.entities):
+            ent.update(dt, self)
+
+            if ent is not player and ent.stats and ent.stats.hp <= 0:
+                loot_bag = ent.drop_loot_bag(loot_sprite)
+                self.entities.remove(ent)
+                self.entities.append(loot_bag)
+                if ent.last_attacker and ent.last_attacker.stats:
+                    leveled = ent.last_attacker.stats.gain_xp(50)
+                    q_msgs = []
+                    if getattr(ent.last_attacker, "quests", None):
+                        q_msgs = ent.last_attacker.quests.on_enemy_killed(ent)
+
+                    if ent.last_attacker is player:
+                        if q_msgs:
+                            event_msg = q_msgs
+                        elif leveled:
+                            event_msg = f"УРОВЕНЬ {player.stats.level}! Нажми C (Очков: {player.stats.stat_points})"
+                        else:
+                            event_msg = f"{ent.name} побежден! (+50 XP)"
+                    else:
+                        event_msg = f"{ent.name} пал от руки {ent.last_attacker.name}!"
+
+        for ent in list(self.entities):
+            if getattr(ent, "is_loot_bag", False) and ent.inventory:
+                if len(ent.inventory.items) == 0 and ent.inventory.gold <= 0:
+                    if not (ui.is_open and ui.target is ent):
+                        self.entities.remove(ent)
+
+        for proj in list(self.projectiles):
+            proj.update(dt, self)
+            if not proj.alive:
+                self.projectiles.remove(proj)
+
+        return event_msg
+
+    def draw(self, surface, sprites, camera, speech_font=None):
         start_c = max(0, camera.offset_x // TILE_SIZE)
         end_c = min(self.cols, (camera.offset_x + NATIVE_WIDTH) // TILE_SIZE + 2)
         start_r = max(0, camera.offset_y // TILE_SIZE)
@@ -109,15 +143,37 @@ class WorldMap:
         for r in range(start_r, end_r):
             for c in range(start_c, end_c):
                 tile_key = self.tiles[r][c]
-                spr = sprites.get(tile_key, sprites["floor"])
-                screen_x = c * TILE_SIZE - camera.offset_x
-                screen_y = r * TILE_SIZE - camera.offset_y
-                surface.blit(spr, (screen_x, screen_y))
+                spr = sprites.get(tile_key, sprites.get("floor"))
+                if spr:
+                    surface.blit(spr, (c * TILE_SIZE - camera.offset_x, r * TILE_SIZE - camera.offset_y))
 
-        # Рисуем разметку мест под будущие здания
         for idx, plot in enumerate(self.building_plots):
             r_scr = camera.apply_rect(plot)
             pygame.draw.rect(surface, (160, 140, 100), r_scr, 1)
-            if font:
-                lbl = font.render(f"Место под дом #{idx + 1}", False, (210, 195, 155))
+            if speech_font:
+                lbl = speech_font.render(f"Место под дом #{idx + 1}", False, (210, 195, 155))
                 surface.blit(lbl, (r_scr.x + 4, r_scr.y + 4))
+
+        # Отрисовка всех сущностей с учетом смещения камеры
+        for ent in sorted(self.entities, key=lambda e: e.rect.bottom):
+            orig_pos = ent.rect.topleft
+            ent.rect.x -= camera.offset_x
+            ent.rect.y -= camera.offset_y
+            if ent.combat and ent.combat.swing_rect:
+                ent.combat.swing_rect.x -= camera.offset_x
+                ent.combat.swing_rect.y -= camera.offset_y
+
+            ent.draw(surface, speech_font)
+
+            ent.rect.topleft = orig_pos
+            if ent.combat and ent.combat.swing_rect:
+                ent.combat.swing_rect.x += camera.offset_x
+                ent.combat.swing_rect.y += camera.offset_y
+
+        # Отрисовка всех снарядов с учетом смещения камеры
+        for proj in self.projectiles:
+            proj.pos_x -= camera.offset_x
+            proj.pos_y -= camera.offset_y
+            proj.draw(surface)
+            proj.pos_x += camera.offset_x
+            proj.pos_y += camera.offset_y

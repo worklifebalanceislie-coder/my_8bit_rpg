@@ -1,457 +1,57 @@
 import pygame
 
 PALETTE = {
-    '.': None,
-    'D': (115, 85, 55),      # Земля (основа)
-    'd': (95, 68, 42),       # Земля (камешки)
-    'P': (225, 200, 130),    # Песок (основа)
-    'p': (200, 175, 105),    # Песок (рябь)
-    'V': (55, 145, 70),      # Трава (основа)
-    'v': (42, 118, 55),      # Трава (тень)
-    'Z': (85, 175, 90),      # Трава (светлые травинки)
-    'A': (65, 130, 215),     # Вода (основа)
-    'a': (120, 185, 245),    # Вода (блики)
-    'Q': (130, 135, 145),    # Брусчатка (камень)
-    'q': (95, 100, 110),     # Брусчатка (швы)
-    'K': (20, 20, 28),
-    'S': (245, 195, 150),
-    'H': (110, 60, 35),
-    'G': (70, 180, 100),
-    'g': (45, 130, 70),
-    'Y': (220, 170, 50),
-    'y': (170, 120, 30),
-    'B': (150, 90, 50),
-    'b': (100, 55, 30),
-    'W': (85, 92, 110),
-    'w': (60, 65, 80),
-    'L': (115, 122, 140),
-    'F': (38, 43, 54),
-    'f': (46, 52, 64),
-    'E': (100, 170, 60),
-    'e': (65, 115, 40),
-    'R': (220, 50, 50),
-    'C': (70, 130, 210),
-    'c': (45, 85, 150),
-    'M': (195, 205, 220),    # Блестящая сталь (железный меч, кольчуга)
-    'm': (130, 140, 155),    # Тень стали
-    'U': (190, 55, 55),
-    'O': (165, 95, 55),      # Ржавчина (ржавый меч)
-    'o': (115, 65, 35),      # Тень ржавчины
+    ".": None,              # Прозрачный
+    "K": (20, 20, 28),      # Черный контур
+    "S": (235, 185, 140),   # Кожа светлая
+    "s": (195, 140, 100),   # Кожа тень
+    "H": (75, 50, 35),      # Волосы / темное дерево
+    "G": (65, 155, 80),     # Зеленый плащ / одежда
+    "g": (40, 105, 50),     # Темно-зеленый
+    "Y": (240, 200, 65),    # Золото / солома / блондин
+    "y": (185, 145, 35),    # Темное золото
+    "B": (140, 90, 45),     # Дерево (сундук, мешок, лук, посох)
+    "b": (95, 60, 30),      # Темное дерево / штаны
+    "R": (200, 55, 55),     # Красный (рубин, уши, плащ)
+    "r": (140, 30, 30),     # Темно-красный
+    "C": (65, 125, 200),    # Синий (куртка странника)
+    "c": (40, 80, 145),     # Темно-синий
+    "M": (175, 185, 200),   # Металл / сталь / шлем
+    "m": (115, 125, 140),   # Темный металл
+    "U": (165, 50, 50),     # Мундир стражника
+    "E": (90, 175, 65),     # Кожа гоблина
+    "e": (55, 115, 40),     # Тень кожи гоблина
+    "O": (195, 110, 45),    # Ржавчина / медь
+    "o": (140, 75, 30),     # Темная ржавчина
+    "F": (130, 135, 145),   # Каменный пол
+    "f": (105, 110, 120),   # Трещинки на полу
+    "L": (110, 115, 125),   # Светлый кирпич стены
+    "W": (85, 90, 100),     # Кирпич стены
+    "w": (55, 60, 70),      # Швы стены
+    "V": (70, 150, 60),     # Трава
+    "v": (50, 120, 45),     # Темная трава
+    "Z": (115, 185, 75),    # Светлая травинка
+    "D": (145, 105, 65),    # Земляная тропа
+    "d": (115, 80, 45),     # Камешки на земле
+    "P": (225, 200, 125),   # Песок
+    "p": (195, 170, 95),    # Темный песок
+    "Q": (150, 155, 165),   # Брусчатка
+    "q": (100, 105, 115),   # Швы брусчатки
+    "A": (55, 130, 205),    # Вода
+    "a": (95, 170, 235),    # Блик на воде
 }
 
-def build_sprite(matrix):
+
+def build_sprite(art_matrix):
+    """Превращает текстовую матрицу 16x16 в Surface с прозрачностью"""
     surf = pygame.Surface((16, 16), pygame.SRCALPHA)
-    for y, row in enumerate(matrix):
-        for x, char in enumerate(row):
-            color = PALETTE.get(char)
-            if color:
-                surf.set_at((x, y), color)
+    for r, row in enumerate(art_matrix[:16]):
+        for c, ch in enumerate(row[:16]):
+            col = PALETTE.get(ch)
+            if col:
+                surf.set_at((c, r), col)
     return surf
 
-PLAYER_ART = [
-    ".....KKKKKK.....",
-    "....KHHHHHHK....",
-    "....KHHHHHHK....",
-    "....KSSSSSSK....",
-    "....KSKSSKSK....",
-    "....KSSSSSSK....",
-    ".....KKKKKK.....",
-    "...KKGGGGGGKK...",
-    "..KGGGGGGGGGGK..",
-    "..KGGgGGGGgGGK..",
-    "..KSSKGGGGKSSK..",
-    "..KK.KYYYYK.KK..",
-    ".....KggggK.....",
-    ".....KggggK.....",
-    ".....KK..KK.....",
-    "....KKK..KKK...."
-]
-
-NPC_ART = [
-    "....KKKKKKKK....",
-    "...KYYYYYYYYK...",
-    "..KYYYYYYYYYYK..",
-    "....KSSSSSSK....",
-    "....KSKSSKSK....",
-    "....KHHHHHHK....",
-    ".....KHHHHK.....",
-    "...KKYYYYYYKK...",
-    "..KYYyYYYYyYYK..",
-    "..KYYyYYYYyYYK..",
-    "..KSSKYYYYKSSK..",
-    "..KK.KbbbbK.KK..",
-    ".....KyyyyK.....",
-    ".....KyyyyK.....",
-    ".....KK..KK.....",
-    "....KKK..KKK...."
-]
-
-GOBLIN_ART = [
-    "................",
-    "....KKKKKKKK....",
-    "..KKKEEEEEEKKK..",
-    ".KEEKREEEERKKEK.",
-    "..KKKEEEEEEKKK..",
-    "....KEKKKKKK....",
-    ".....KKKKKK.....",
-    "...KKbbbbbbKK...",
-    "..KbbbbbbbbbbK..",
-    "..KEEKbbbbKEEK..",
-    "..KK.KYYYYK.KK..",
-    ".....KeeeeK.....",
-    ".....KeeeeK.....",
-    ".....KK..KK.....",
-    "....KKK..KKK....",
-    "................"
-]
-
-GUARD_ART = [
-    "....KKKKKKKK....",
-    "...KMMMMMMMMK...",
-    "..KMMmMMMMmMMK..",
-    "...KMSSSSSSMK...",
-    "....KSKSSKSK....",
-    "....KSSSSSSK....",
-    ".....KKKKKK.....",
-    "...KKUUUUUUKK...",
-    "..KUUUUUUUUUUK..",
-    "..KUUYUUUUYUUK..",
-    "..KMMKUUUUKMMK..",
-    "..KK.KMMMMK.KK..",
-    ".....KmmmmK.....",
-    ".....KmmmmK.....",
-    ".....KK..KK.....",
-    "....KKK..KKK...."
-]
-
-ADVENTURER_ART = [
-    ".....KKKKKK.....",
-    "....KYYYYYYK....",
-    "....KYYYYYYK....",
-    "....KSSSSSSK....",
-    "....KSKSSKSK....",
-    "....KSSSSSSK....",
-    ".....KKKKKK.....",
-    "...KKCCCCCCKK...",
-    "..KCCCCCCCCCCK..",
-    "..KCCcCCCCcCCK..",
-    "..KSSKCCCCKSSK..",
-    "..KK.KbbbbK.KK..",
-    ".....KccccK.....",
-    ".....KccccK.....",
-    ".....KK..KK.....",
-    "....KKK..KKK...."
-]
-
-# --- СЛОИ ЭКИПИРОВКИ (накладываются поверх персонажа) ---
-
-LEATHER_ARMOR_ART = [
-    "................",
-    "................",
-    "................",
-    "................",
-    "................",
-    "................",
-    "................",
-    "....KKKKKKKK....",
-    "....KBBBBBBK....",
-    "....KBbBBbBK....",
-    ".....KBBBBK.....",
-    ".....KYYYYK.....",
-    "................",
-    "................",
-    "................",
-    "................"
-]
-
-CHAINMAIL_ART = [
-    "................",
-    "................",
-    "................",
-    "................",
-    "................",
-    "................",
-    "................",
-    "....KKKKKKKK....",
-    "....KMmMmMmK....",
-    "....KmMmMmMK....",
-    ".....KMmMmK.....",
-    ".....KYYYYK.....",
-    "................",
-    "................",
-    "................",
-    "................"
-]
-
-RUSTY_SWORD_ART = [
-    "................",
-    "................",
-    "................",
-    "..............K.",
-    ".............KOK",
-    "............KOoK",
-    "...........KOoK.",
-    "..........KOoK..",
-    ".........KKYK...",
-    "........KYYK....",
-    "........KHK.....",
-    "................",
-    "................",
-    "................",
-    "................",
-    "................"
-]
-
-IRON_SWORD_ART = [
-    "................",
-    "................",
-    "...............K",
-    "..............KM",
-    ".............KMM",
-    "............KMMm",
-    "...........KMMmK",
-    "..........KMMmK.",
-    ".........KKYK...",
-    "........KYYK....",
-    "........KHK.....",
-    "................",
-    "................",
-    "................",
-    "................",
-    "................"
-]
-
-BOW_ART = [
-    "................",
-    "................",
-    "................",
-    "...........KK...",
-    "..........KBBK..",
-    ".........KB..MK.",
-    ".........KB..MK.",
-    ".........KB..MK.",
-    ".........KB..MK.",
-    "..........KBBK..",
-    "...........KK...",
-    "................",
-    "................",
-    "................",
-    "................",
-    "................"
-]
-
-FIRE_STAFF_ART = [
-    "................",
-    "............KK..",
-    "...........KRRK.",
-    "...........KYYK.",
-    "............KK..",
-    "............KB..",
-    "...........KB...",
-    "..........KB....",
-    ".........KB.....",
-    "........KB......",
-    ".......KB.......",
-    "................",
-    "................",
-    "................",
-    "................",
-    "................"
-]
-
-LOOT_ART = [
-    "................",
-    "................",
-    "......KKKK......",
-    ".....KBBBBK.....",
-    "......KYYK......",
-    "....KKBBBBKK....",
-    "...KBBBBBBBBK...",
-    "..KBBBBbbBBBBK..",
-    "..KBBBbbbbBBBK..",
-    "..KBBBBbbBBBBK..",
-    "...KbbbbbbbbK...",
-    "....KKKKKKKK....",
-    "................",
-    "................",
-    "................",
-    "................"
-]
-
-CHEST_ART = [
-    "................",
-    "................",
-    "..KKKKKKKKKKKK..",
-    ".KBBBBBBBBBBBBK.",
-    ".KBBBBYYYYBBBBK.",
-    ".KBBBBYKKYBBBBK.",
-    ".KKKKKKKKKKKKKK.",
-    ".KbbbbYKKYbbbbK.",
-    ".KbbbbYYYYbbbbK.",
-    ".KbbbbbbbbbbbbK.",
-    ".KbbbbbbbbbbbbK.",
-    ".KbbbbbbbbbbbbK.",
-    "..KKKKKKKKKKKK..",
-    "................",
-    "................",
-    "................"
-]
-
-WALL_ART = [
-    "LLLLLLLLLLLLLLLw",
-    "LWWWWWWwWWWWWWWw",
-    "LWWWWWWwWWWWWWWw",
-    "wwwwwwwwwwwwwwww",
-    "LLLwLLLLLLLLLLLw",
-    "WWWwWWWWWWWWWWWw",
-    "WWWwWWWWWWWWWWWw",
-    "wwwwwwwwwwwwwwww",
-    "LLLLLLLLLLwLLLLw",
-    "WWWWWWWWWWwWWWWw",
-    "WWWWWWWWWWwWWWWw",
-    "wwwwwwwwwwwwwwww",
-    "LLLLwLLLLLLLLLLw",
-    "WWWWwWWWWWWWWWWw",
-    "WWWWwWWWWWWWWWWw",
-    "wwwwwwwwwwwwwwww"
-]
-
-FLOOR_ART = [
-    "FFFFFFFFFFFFFFFF",
-    "FffFFFFFFFFFFFFF",
-    "FffFFFFFFFFFFFFF",
-    "FFFFFFFFFFFFFFFF",
-    "FFFFFFFFFFFFFFFF",
-    "FFFFFFFFFFffFFFF",
-    "FFFFFFFFFFffFFFF",
-    "FFFFFFFFFFFFFFFF",
-    "FFFFFFFFFFFFFFFF",
-    "FFFFffFFFFFFFFFF",
-    "FFFFffFFFFFFFFFF",
-    "FFFFFFFFFFFFFFFF",
-    "FFFFFFFFFFFFFFFF",
-    "FFFFFFFFFFFFffFF",
-    "FFFFFFFFFFFFffFF",
-    "FFFFFFFFFFFFFFFF"
-]
-
-GRASS_ART = [
-    "VVVVVVVVVVVVVVVV",
-    "VVZVVVVVVVVVVVVV",
-    "VVVVVVVVVVvVVVVV",
-    "VVVVVVVVVVVVVVVV",
-    "VVVVVVVVVVVVZVVV",
-    "VVvVVVVVVVVVVVVV",
-    "VVVVVVVVVVVVVVVV",
-    "VVVVVVZVVVVVVVVV",
-    "VVVVVVVVVVVVVVvV",
-    "VVVVVVVVVVVVVVVV",
-    "VVZVVVVVVVVVVVVV",
-    "VVVVVVVVVvVVVVVV",
-    "VVVVVVVVVVVVVVVV",
-    "VVVVVVVVVVVVZVVV",
-    "VVVVvVVVVVVVVVVV",
-    "VVVVVVVVVVVVVVVV"
-]
-
-DIRT_ART = [
-    "DDDDDDDDDDDDDDDD",
-    "DDdDDDDDDDDDDDDD",
-    "DDDDDDDDDDDdDDDD",
-    "DDDDDDDDDDDDDDDD",
-    "DDDDDDdDDDDDDDDD",
-    "DDDDDDDDDDDDDDDD",
-    "DDDDDDDDDDDDdDDD",
-    "DDdDDDDDDDDDDDDD",
-    "DDDDDDDDDDDDDDDD",
-    "DDDDDDDDdDDDDDDD",
-    "DDDDDDDDDDDDDDDD",
-    "DDDDdDDDDDDDDdDD",
-    "DDDDDDDDDDDDDDDD",
-    "DDDDDDDDDDdDDDDD",
-    "DDdDDDDDDDDDDDDD",
-    "DDDDDDDDDDDDDDDD"
-]
-
-SAND_ART = [
-    "PPPPPPPPPPPPPPPP",
-    "PPpPPPPPPPPPPPPP",
-    "PPPPPPPPPPpPPPPP",
-    "PPPPPPPPPPPPPPPP",
-    "PPPPpPPPPPPPPPPP",
-    "PPPPPPPPPPPPpPPP",
-    "PPPPPPPPPPPPPPPP",
-    "PPPPPPPPpPPPPPPP",
-    "PPpPPPPPPPPPPPPP",
-    "PPPPPPPPPPPPPPPP",
-    "PPPPPPPPPPPPpPPP",
-    "PPPPPPpPPPPPPPPP",
-    "PPPPPPPPPPPPPPPP",
-    "PPpPPPPPPPPPPPPP",
-    "PPPPPPPPpPPPPPPP",
-    "PPPPPPPPPPPPPPPP"
-]
-
-COBBLE_ART = [
-    "qqqqqqqqqqqqqqqq",
-    "qQQQQQqQQQQQQQqQ",
-    "qQQQQQqQQQQQQQqQ",
-    "qQQQQQqQQQQQQQqQ",
-    "qqqqqqqqqqqqqqqq",
-    "QQQqQQQQQQQqQQQQ",
-    "QQQqQQQQQQQqQQQQ",
-    "QQQqQQQQQQQqQQQQ",
-    "qqqqqqqqqqqqqqqq",
-    "qQQQQQqQQQQQQQqQ",
-    "qQQQQQqQQQQQQQqQ",
-    "qQQQQQqQQQQQQQqQ",
-    "qqqqqqqqqqqqqqqq",
-    "QQQqQQQQQQQqQQQQ",
-    "QQQqQQQQQQQqQQQQ",
-    "qqqqqqqqqqqqqqqq"
-]
-
-WATER_ART = [
-    "AAAAAAAAAAAAAAAA",
-    "AAaaAAAAAAAAAAAA",
-    "AAAAAAAAAAAAAAAA",
-    "AAAAAAAAAAaaaAAA",
-    "AAAAAAAAAAAAAAAA",
-    "AAAAaaaAAAAAAAAA",
-    "AAAAAAAAAAAAAAAA",
-    "AAAAAAAAAAAAAAAA",
-    "AAAAAAAAAAAAaaAA",
-    "AAAAAAAAAAAAAAAA",
-    "AAaaaAAAAAAAAAAA",
-    "AAAAAAAAAAAAAAAA",
-    "AAAAAAAAaaAAAAAA",
-    "AAAAAAAAAAAAAAAA",
-    "AAAAaaAAAAAAAAAA",
-    "AAAAAAAAAAAAAAAA"
-]
-
-def load_sprites():
-    return {
-        "player": build_sprite(PLAYER_ART),
-        "npc": build_sprite(NPC_ART),
-        "goblin": build_sprite(GOBLIN_ART),
-        "guard": build_sprite(GUARD_ART),
-        "adventurer": build_sprite(ADVENTURER_ART),
-        "loot": build_sprite(LOOT_ART),
-        "chest": build_sprite(CHEST_ART),
-        "wall": build_sprite(WALL_ART),
-        "floor": build_sprite(FLOOR_ART),
-        # Спрайты экипировки по item_id
-        "equip_leather_armor": build_sprite(LEATHER_ARMOR_ART),
-        "equip_chainmail": build_sprite(CHAINMAIL_ART),
-        "equip_rusty_sword": build_sprite(RUSTY_SWORD_ART),
-        "equip_iron_sword": build_sprite(IRON_SWORD_ART),
-        "equip_hunting_bow": build_sprite(BOW_ART),
-        "equip_fire_staff": build_sprite(FIRE_STAFF_ART),
-        "grass": build_sprite(GRASS_ART),
-        "dirt": build_sprite(DIRT_ART),
-        "sand": build_sprite(SAND_ART),
-        "cobble": build_sprite(COBBLE_ART),
-        "water": build_sprite(WATER_ART),
-
-    }
+def load_sprites(db):
+    """Загружает все спрайты напрямую из таблицы sprites_catalog базы данных"""
+    return db.load_sprites_from_db(build_sprite)

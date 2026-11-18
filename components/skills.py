@@ -5,7 +5,7 @@ class Skill:
     def __init__(self, skill_id, name, kind, mana_cost=0, cooldown=3.0, desc=""):
         self.id = skill_id
         self.name = name
-        self.kind = kind          # 'active' или 'passive'
+        self.kind = kind
         self.mana_cost = mana_cost
         self.cooldown = cooldown
         self.timer = 0.0
@@ -19,20 +19,24 @@ SKILLS_DB = {
     "passive_blade": Skill("passive_blade", "Мастер клинка", "passive", desc="Пассивно: +50% от Силы к ближ. урону"),
     "passive_skin": Skill("passive_skin", "Каменная кожа", "passive", desc="Пассивно: +50% от Стойкости к броне"),
     "passive_mana": Skill("passive_mana", "Поток маны", "passive", desc="Пассивно: +0.5 x Инт к регену MP/с"),
+        # РАСОВЫЕ НАВЫКИ
+    "race_human": Skill("race_human", "Воля человека", "passive", desc="Раса: +20% к получаемому опыту и +1 к Защите"),
+    "race_elf": Skill("race_elf", "Шаг ветра", "active", mana_cost=8, cooldown=2.5, desc="Раса: мгновенный рывок в сторону движения"),
+    "race_goblin": Skill("race_goblin", "Гоблинская жадность", "passive", desc="Раса: +50% золота при сборе лута и из сундуков"),
+    "race_skeleton": Skill("race_skeleton", "Похищение жизни", "active", mana_cost=12, cooldown=3.5, desc="Раса: урон Инт x1.8 и лечение на 50% урона"),
+
 }
 
 def create_skill(skill_id):
-    template = SKILLS_DB.get(skill_id)
-    if not template:
-        return None
-    return Skill(template.id, template.name, template.kind, template.mana_cost, template.cooldown, template.desc)
+    t = SKILLS_DB.get(skill_id)
+    return Skill(t.id, t.name, t.kind, t.mana_cost, t.cooldown, t.desc) if t else None
 
 
 class SkillBook:
     def __init__(self, owner, max_slots=4):
         self.owner = owner
         self.max_slots = max_slots
-        self.learned = []  # Список выученных объектов Skill (макс. 4)
+        self.learned = []
 
     def has_skill(self, skill_id):
         return any(s.id == skill_id for s in self.learned)
@@ -62,8 +66,7 @@ class SkillBook:
             if sk.timer > 0:
                 sk.timer = max(0.0, sk.timer - dt)
 
-    def use_active_slot(self, slot_index, entities, projectiles, walls, aim_pos=None):
-        """Применяет активный навык по номеру слота (0 или 1)"""
+    def use_active_slot(self, slot_index, world, aim_pos=None):
         actives = self.get_active_skills()
         if slot_index >= len(actives):
             return False, "Слот навыка пуст"
@@ -78,7 +81,6 @@ class SkillBook:
             self.owner.say("Мало маны!", 0.8)
             return False, "Недостаточно маны!"
 
-        # Направление прицела мыши или направление взгляда персонажа (включая верх/низ)
         if aim_pos:
             ax, ay = aim_pos
             dx = ax - self.owner.rect.centerx
@@ -88,9 +90,8 @@ class SkillBook:
             if dx != 0:
                 self.owner.facing_left = (dx < 0)
         else:
-            dx, dy = getattr(self.owner, "facing_dir", (-1.0 if self.owner.facing_left else 1.0, 0.0))
+            dx, dy = self.owner.facing_dir
 
-        # 1. ВИХРЬ КЛИНКА (Круговой удар вокруг себя от Силы)
         if sk.id == "whirlwind":
             st.mp -= sk.mana_cost
             sk.timer = sk.cooldown
@@ -99,22 +100,14 @@ class SkillBook:
                 self.owner.combat.swing_timer = 0.25
             aoe = self.owner.rect.inflate(34, 34)
             raw_dmg = st.str * 2 + (self.owner.equipment.get_total_bonus("atk") if self.owner.equipment else 0)
-            for target in entities:
-                if target is self.owner or not target.stats or target.stats.hp <= 0:
-                    continue
-                if target.faction == self.owner.faction:
+            for target in world.entities:
+                if target is self.owner or target.faction == self.owner.faction:
                     continue
                 if aoe.colliderect(target.rect):
-                    dmg, is_crit = st.roll_damage(raw_dmg, target.stats.get_def())
-                    target.stats.hp = max(0.0, target.stats.hp - dmg)
-                    target.hurt_timer = 0.2
-                    target.last_attacker = self.owner
-                    if is_crit:
-                        target.say("КРИТ!", 0.8)
+                    target.take_damage(raw_dmg, attacker=self.owner)
             return True, f"Применено: {sk.name}"
 
-        # 2. ЗАЛП СТРЕЛ (Веер из 3 стрел от Ловкости)
-        elif sk.id == "volley" and projectiles is not None:
+        elif sk.id == "volley":
             st.mp -= sk.mana_cost
             sk.timer = sk.cooldown
             self.owner.say("Залп!", 0.8)
@@ -123,21 +116,17 @@ class SkillBook:
             for offset in (-0.25, 0.0, 0.25):
                 ang = base_angle + offset
                 adx, ady = math.cos(ang), math.sin(ang)
-                p = Projectile(self.owner.rect.centerx + adx * 6, self.owner.rect.centery, adx, ady, self.owner, dmg, "arrow")
-                projectiles.append(p)
+                world.projectiles.append(Projectile(self.owner.rect.centerx + adx * 6, self.owner.rect.centery, adx, ady, self.owner, dmg, "arrow"))
             return True, f"Применено: {sk.name}"
 
-        # 3. ЛЕДЯНАЯ СТРЕЛА (Урон от Интеллекта + замедление врага)
-        elif sk.id == "ice_bolt" and projectiles is not None:
+        elif sk.id == "ice_bolt":
             st.mp -= sk.mana_cost
             sk.timer = sk.cooldown
             self.owner.say("Лед!", 0.8)
             dmg = max(3, int(st.int * 2.2))
-            p = Projectile(self.owner.rect.centerx + dx * 6, self.owner.rect.centery, dx, dy, self.owner, dmg, "ice")
-            projectiles.append(p)
+            world.projectiles.append(Projectile(self.owner.rect.centerx + dx * 6, self.owner.rect.centery, dx, dy, self.owner, dmg, "ice"))
             return True, f"Применено: {sk.name}"
 
-        # 4. СВЕТ ИСЦЕЛЕНИЯ (Лечение от Интеллекта)
         elif sk.id == "heal_spell":
             st.mp -= sk.mana_cost
             sk.timer = sk.cooldown
@@ -145,5 +134,32 @@ class SkillBook:
             st.hp = min(float(st.max_hp), st.hp + heal_amt)
             self.owner.say(f"+{heal_amt} HP!", 1.0)
             return True, f"Исцеление: +{heal_amt} HP"
+
+        # 5. РАСОВЫЙ НАВЫК ЭЛЬФА: ШАГ ВЕТРА (Рывок вперед)
+        elif sk.id == "race_elf":
+            st.mp -= sk.mana_cost
+            sk.timer = sk.cooldown
+            self.owner.say("Шаг ветра!", 0.8)
+            if self.owner.movement:
+                self.owner.movement.move(dx, dy, 0.35, world.walls)
+            return True, "Применено: Шаг ветра!"
+
+        # 6. РАСОВЫЙ НАВЫК НЕЖИТИ: ПОХИЩЕНИЕ ЖИЗНИ
+        elif sk.id == "race_skeleton":
+            st.mp -= sk.mana_cost
+            sk.timer = sk.cooldown
+            self.owner.say("Похищение!", 0.8)
+            raw_dmg = max(3, int(st.int * 1.8))
+            hit_any = False
+            for target in world.entities:
+                if target is self.owner or target.faction == self.owner.faction or not target.stats:
+                    continue
+                if math.hypot(target.rect.centerx - self.owner.rect.centerx, target.rect.centery - self.owner.rect.centery) <= 55:
+                    dealt = target.take_damage(raw_dmg, attacker=self.owner, is_magic=True)
+                    if dealt > 0:
+                        heal = max(1, dealt // 2)
+                        st.hp = min(float(st.max_hp), st.hp + heal)
+                        hit_any = True
+            return True, ("Похищение жизни: здоровье восстановлено!" if hit_any else "Похищение жизни: рядом нет целей")
 
         return False, ""

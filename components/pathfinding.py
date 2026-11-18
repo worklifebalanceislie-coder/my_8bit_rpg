@@ -1,5 +1,7 @@
 import heapq
 from settings import TILE_SIZE
+import math
+
 
 def build_blocked_grid(walls):
     blocked = set()
@@ -34,7 +36,7 @@ def find_path(start_pos, goal_pos, walls, map_width=640, map_height=400):
         ]
         if not neighbors:
             return []
-        goal = min(neighbors, key=lambda n: abs(n - sc) + abs(n - sr))
+        goal = min(neighbors, key=lambda n: math.hypot(n[0] - sc, n[1] - sr))
 
     goal_c, goal_r = goal
     open_set = []
