@@ -143,14 +143,25 @@ class DatabaseManager:
             )
         """)
 
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS professions_catalog (
+                id TEXT PRIMARY KEY, name TEXT NOT NULL, desc TEXT NOT NULL, bonus_type TEXT NOT NULL
+            )
+        """)
+
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS recipes_catalog (
+                id TEXT PRIMARY KEY, prof_id TEXT NOT NULL, result_item_id TEXT NOT NULL,
+                req_level INTEGER NOT NULL, materials_json TEXT NOT NULL, xp_gain INTEGER NOT NULL
+            )
+        """)
 
         cur.execute("CREATE TABLE IF NOT EXISTS game_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)")
         self.conn.commit()
     
     def sync_all_catalogs(self):
-        """Если база пуста — наполняет её из default_content.json, затем загружает каталоги в память"""
         cur = self.conn.cursor()
-        cur.execute("SELECT COUNT(*) as cnt FROM items_catalog")
+        cur.execute("SELECT COUNT(*) as cnt FROM professions_catalog")
         if cur.fetchone()["cnt"] == 0 and os.path.exists("default_content.json"):
             self.import_from_json_file("default_content.json")
 
@@ -158,7 +169,7 @@ class DatabaseManager:
         self.load_effects_to_memory()
         self.load_skills_to_memory()
         self.load_factions_to_memory()
-        self.sync_monsters_catalog()
+        self.sync_professions_catalog()
 
     def import_from_json_file(self, filepath):
         with open(filepath, "r", encoding="utf-8") as f:
@@ -238,6 +249,12 @@ class DatabaseManager:
             d["items"] = json.loads(d["items"])
             res.append(d)
         return res
+
+    def get_professions_from_db(self):
+        from components.professions import ProfessionInfo
+        cur = self.conn.cursor()
+        cur.execute("SELECT * FROM professions_catalog")
+        return [ProfessionInfo(r["id"], r["name"], r["desc"], r["bonus_type"]) for r in cur.fetchall()]
 
     def spawn_location_entities(self, location_id, sprites):
         """Создает живые сущности для локации напрямую из таблицы npc_templates БД"""
@@ -328,7 +345,9 @@ class DatabaseManager:
                  "reward_item": q.reward_item, "status": q.status}
                 for q in ent.quests.quests
             ] if ent.quests else None,
-            "effects": [{"id": e.id, "duration": e.duration, "power": e.power} for e in ent.effects.active] if getattr(ent, "effects", None) else []
+            "effects": [{"id": e.id, "duration": e.duration, "power": e.power} for e in ent.effects.active] if getattr(ent, "effects", None) else [],
+            "professions": ent.professions.learned if getattr(ent, "professions", None) else {}
+
         }
         return json.dumps(data, ensure_ascii=False)
 
@@ -383,6 +402,9 @@ class DatabaseManager:
                 ent.quests.quests.append(q)
         for eff_data in data.get("effects", []):
             ent.effects.apply(eff_data["id"], eff_data["duration"], eff_data["power"])
+
+        if getattr(ent, "professions", None) and data.get("professions"):
+            ent.professions.learned = data["professions"]
 
         ent.link_components()
         return ent
@@ -622,4 +644,19 @@ class DatabaseManager:
 
         self.conn.commit()
 
+    def sync_professions_catalog(self):
+        from components.professions import PROFESSIONS_DB, RECIPES_DB, ProfessionInfo, Recipe
+        cur = self.conn.cursor()
 
+        cur.execute("SELECT * FROM professions_catalog")
+        PROFESSIONS_DB.clear()
+        for r in cur.fetchall():
+            PROFESSIONS_DB[r["id"]] = ProfessionInfo(r["id"], r["name"], r["desc"], r["bonus_type"])
+
+        cur.execute("SELECT * FROM recipes_catalog")
+        RECIPES_DB.clear()
+        for r in cur.fetchall():
+            RECIPES_DB[r["id"]] = Recipe(
+                r["id"], r["prof_id"], r["result_item_id"],
+                r["req_level"], json.loads(r["materials_json"]), r["xp_gain"]
+            )

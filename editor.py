@@ -51,6 +51,7 @@ class RPGContentStudio:
         self.build_classes_tab()
         self.build_factions_tab()
         self.build_monsters_tab()
+        self.build_professions_tab()
 
         self.status_var = tk.StringVar(value="База данных rpg.db подключена и готова к работе.")
         ttk.Label(self.root, textvariable=self.status_var, relief=tk.SUNKEN, anchor=tk.W).pack(fill=tk.X, side=tk.BOTTOM)
@@ -73,7 +74,7 @@ class RPGContentStudio:
         tables = [
             "sprites_catalog", "items_catalog", "skills_catalog", "effects_catalog",
             "races_catalog", "classes_catalog", "factions_catalog", "npc_templates",
-            "monster_archetypes", "monster_parts"
+            "monster_archetypes", "monster_parts", "professions_catalog", "recipes_catalog"
         ]
 
         dump = {}
@@ -116,6 +117,7 @@ class RPGContentStudio:
         self.refresh_classes_table()
         self.refresh_factions_table()
         self.refresh_monsters_tables()
+        self.refresh_professions_tables()
     
     def build_sprites_tab(self):
         tab = ttk.Frame(self.notebook, padding=10)
@@ -1080,6 +1082,165 @@ class RPGContentStudio:
             self.refresh_monsters_tables()
             self.refresh_sprite_list()
 
+    # =========================================================================
+    # 8. ВКЛАДКА ПРОФЕССИЙ И РЕЦЕПТОВ КРАФТА
+    # =========================================================================
+    def build_professions_tab(self):
+        tab = ttk.Frame(self.notebook, padding=10)
+        self.notebook.add(tab, text="8. Профессии и Крафт")
+
+        # Левая половина: Профессии
+        left = ttk.LabelFrame(tab, text="Профессии", padding=10)
+        left.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 8))
+
+        self.pr_id = tk.StringVar()
+        self.pr_name = tk.StringVar()
+        self.pr_btype = tk.StringVar(value="craft")
+        self.pr_desc = tk.StringVar()
+
+        p_rows = [
+            ("ID профессии:", ttk.Entry(left, textvariable=self.pr_id, width=25)),
+            ("Название:", ttk.Entry(left, textvariable=self.pr_name, width=25)),
+            ("Тип бонуса:", ttk.Combobox(left, textvariable=self.pr_btype, state="readonly", width=22, values=["craft", "trade", "gather"])),
+            ("Описание:", ttk.Entry(left, textvariable=self.pr_desc, width=25)),
+        ]
+        for idx, (lbl, w) in enumerate(p_rows):
+            ttk.Label(left, text=lbl).grid(row=idx, column=0, sticky=tk.W, pady=3)
+            w.grid(row=idx, column=1, sticky=tk.W, pady=3, padx=5)
+
+        btns = ttk.Frame(left)
+        btns.grid(row=4, column=0, columnspan=2, pady=8)
+        ttk.Button(btns, text="Сохранить профессию", command=self.save_profession).pack(side=tk.LEFT, padx=4)
+        ttk.Button(btns, text="Удалить", command=self.delete_profession).pack(side=tk.LEFT, padx=4)
+
+        self.prof_tree = ttk.Treeview(left, columns=("id", "name", "type", "desc"), show="headings", height=12)
+        for c, t, w in [("id", "ID", 90), ("name", "Название", 110), ("type", "Тип", 65), ("desc", "Описание", 210)]:
+            self.prof_tree.heading(c, text=t)
+            self.prof_tree.column(c, width=w)
+        self.prof_tree.grid(row=5, column=0, columnspan=2, sticky=tk.NSEW, pady=6)
+        self.prof_tree.bind("<<TreeviewSelect>>", self.on_prof_select)
+
+        # Правая половина: Рецепты крафта
+        right = ttk.LabelFrame(tab, text="Рецепты создания предметов", padding=10)
+        right.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(8, 0))
+
+        self.rec_id = tk.StringVar()
+        self.rec_prof = tk.StringVar(value="blacksmith")
+        self.rec_res = tk.StringVar()
+        self.rec_lvl = tk.IntVar(value=1)
+        self.rec_xp = tk.IntVar(value=25)
+        self.rec_mats = tk.StringVar(value='{"iron_ore": 2, "wood_log": 1}')
+
+        r_rows = [
+            ("ID рецепта:", ttk.Entry(right, textvariable=self.rec_id, width=26)),
+            ("Профессия:", ttk.Combobox(right, textvariable=self.rec_prof, width=23, values=self.get_prof_ids())),
+            ("Результат (ID предмета):", ttk.Entry(right, textvariable=self.rec_res, width=26)),
+            ("Требуемый уровень:", ttk.Spinbox(right, from_=1, to=50, textvariable=self.rec_lvl, width=8)),
+            ("Опыт за создание:", ttk.Spinbox(right, from_=5, to=1000, textvariable=self.rec_xp, width=8)),
+            ("Материалы (JSON):", ttk.Entry(right, textvariable=self.rec_mats, width=26)),
+        ]
+        for idx, (lbl, w) in enumerate(r_rows):
+            ttk.Label(right, text=lbl).grid(row=idx, column=0, sticky=tk.W, pady=3)
+            w.grid(row=idx, column=1, sticky=tk.W, pady=3, padx=5)
+
+        r_btns = ttk.Frame(right)
+        r_btns.grid(row=6, column=0, columnspan=2, pady=8)
+        ttk.Button(r_btns, text="Сохранить рецепт", command=self.save_recipe).pack(side=tk.LEFT, padx=4)
+        ttk.Button(r_btns, text="Удалить", command=self.delete_recipe).pack(side=tk.LEFT, padx=4)
+
+        self.rec_tree = ttk.Treeview(right, columns=("id", "prof", "res", "lvl", "mats"), show="headings", height=10)
+        for c, t, w in [("id", "ID", 95), ("prof", "Профессия", 85), ("res", "Результат", 105), ("lvl", "Ур.", 40), ("mats", "Ресурсы", 160)]:
+            self.rec_tree.heading(c, text=t)
+            self.rec_tree.column(c, width=w)
+        self.rec_tree.grid(row=7, column=0, columnspan=2, sticky=tk.NSEW, pady=6)
+        self.rec_tree.bind("<<TreeviewSelect>>", self.on_rec_select)
+
+        self.refresh_professions_tables()
+
+    def get_prof_ids(self):
+        cur = self.db.conn.cursor()
+        cur.execute("SELECT id FROM professions_catalog ORDER BY id")
+        return [r["id"] for r in cur.fetchall()]
+
+    def refresh_professions_tables(self):
+        for r in self.prof_tree.get_children():
+            self.prof_tree.delete(r)
+        cur = self.db.conn.cursor()
+        cur.execute("SELECT * FROM professions_catalog")
+        for r in cur.fetchall():
+            self.prof_tree.insert("", tk.END, values=(r["id"], r["name"], r["bonus_type"], r["desc"]))
+
+        for r in self.rec_tree.get_children():
+            self.rec_tree.delete(r)
+        cur.execute("SELECT * FROM recipes_catalog")
+        for r in cur.fetchall():
+            self.rec_tree.insert("", tk.END, values=(r["id"], r["prof_id"], r["result_item_id"], r["req_level"], r["materials_json"]))
+
+    def on_prof_select(self, _):
+        sel = self.prof_tree.selection()
+        if not sel:
+            return
+        pid, pname, ptype, pdesc = self.prof_tree.item(sel)["values"]
+        self.pr_id.set(pid)
+        self.pr_name.set(pname)
+        self.pr_btype.set(ptype)
+        self.pr_desc.set(pdesc)
+
+    def save_profession(self):
+        pid = self.pr_id.get().strip()
+        if not pid:
+            return
+        self.db.conn.execute("INSERT OR REPLACE INTO professions_catalog VALUES (?, ?, ?, ?)",
+                             (pid, self.pr_name.get().strip(), self.pr_desc.get(), self.pr_btype.get()))
+        self.db.conn.commit()
+        self.refresh_professions_tables()
+        self.set_status(f"Профессия '{pid}' сохранена.")
+
+    def delete_profession(self):
+        pid = self.pr_id.get().strip()
+        if pid:
+            self.db.conn.execute("DELETE FROM professions_catalog WHERE id = ?", (pid,))
+            self.db.conn.commit()
+            self.refresh_professions_tables()
+
+    def on_rec_select(self, _):
+        sel = self.rec_tree.selection()
+        if not sel:
+            return
+        rid, rprof, rres, rlvl, rmats = self.rec_tree.item(sel)["values"]
+        self.rec_id.set(rid)
+        self.rec_prof.set(rprof)
+        self.rec_res.set(rres)
+        self.rec_lvl.set(rlvl)
+        self.rec_mats.set(rmats)
+        cur = self.db.conn.cursor()
+        cur.execute("SELECT xp_gain FROM recipes_catalog WHERE id = ?", (rid,))
+        row = cur.fetchone()
+        if row:
+            self.rec_xp.set(row["xp_gain"])
+
+    def save_recipe(self):
+        rid = self.rec_id.get().strip()
+        if not rid:
+            return
+        try:
+            json.loads(self.rec_mats.get())
+        except Exception:
+            messagebox.showerror("Ошибка", 'Материалы должны быть в формате JSON, например: {"iron_ore": 2}')
+            return
+        self.db.conn.execute("INSERT OR REPLACE INTO recipes_catalog VALUES (?, ?, ?, ?, ?, ?)",
+                             (rid, self.rec_prof.get().strip(), self.rec_res.get().strip(),
+                              self.rec_lvl.get(), self.rec_mats.get(), self.rec_xp.get()))
+        self.db.conn.commit()
+        self.refresh_professions_tables()
+        self.set_status(f"Рецепт '{rid}' сохранен.")
+
+    def delete_recipe(self):
+        rid = self.rec_id.get().strip()
+        if rid:
+            self.db.conn.execute("DELETE FROM recipes_catalog WHERE id = ?", (rid,))
+            self.db.conn.commit()
+            self.refresh_professions_tables()
 
 if __name__ == "__main__":
     root = tk.Tk()

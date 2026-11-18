@@ -5,6 +5,7 @@ from components.inventory import Inventory
 from components.quests import Quest
 from entities import Entity
 from items import ITEMS_DB
+from components.professions import PROFESSIONS_DB, RECIPES_DB
 
 SLOT_NAMES_RU = {
     "weapon": "Оружие",
@@ -72,6 +73,18 @@ class UIManager:
         self.active_side = "left"
         self.cursor = 0
 
+    def open_professions(self):
+        self.is_open = True
+        self.mode = "professions"
+        self.target = None
+        self.active_side = "left"
+        self.cursor = 0
+
+    def get_available_recipes(self):
+        if not getattr(self.player, "professions", None):
+            return []
+        return [r for r in RECIPES_DB.values() if self.player.professions.has_profession(r.prof_id)]
+
     def open_dialogue(self, npc):
         self.is_open = True
         self.mode = "dialogue"
@@ -105,6 +118,7 @@ class UIManager:
         opts = []
         dlg = npc.dialogue or {}
 
+        # Квест НПС
         q_data = dlg.get("quest")
         if q_data and self.player.quests:
             existing = self.player.quests.get_quest(q_data["id"])
@@ -115,6 +129,17 @@ class UIManager:
             elif existing.status == "ready":
                 opts.append(("turn_in_quest", f"[Сдать задание!] {existing.title}"))
 
+        # Обучение профессии у НПС
+        teach = dlg.get("teach_profession")
+        if teach and getattr(self.player, "professions", None):
+            p_id = teach["id"]
+            if p_id in PROFESSIONS_DB and not self.player.professions.has_profession(p_id):
+                p_name = PROFESSIONS_DB[p_id].name
+                cost = teach.get("cost", 0)
+                cost_str = f" ({cost}G)" if cost > 0 else " (Бесплатно)"
+                opts.append(("learn_prof", f"[Обучение] Профессия: {p_name}{cost_str}"))
+
+        # Торговля
         if npc.ai and npc.ai.role == "merchant" and npc.inventory:
             opts.append(("open_trade", "Посмотреть товары (Торговля)"))
 
@@ -131,7 +156,8 @@ class UIManager:
             return len(self.player.quests.quests) if self.player.quests else 0
         if self.mode == "dialogue":
             return len(self.get_dialogue_options())
-
+        if self.mode == "professions":
+            return len(self.get_available_recipes())
         if self.active_side == "left":
             return len(self.player.inventory.items)
         if self.mode == "inventory":
@@ -139,6 +165,7 @@ class UIManager:
         if self.target and self.target.inventory:
             return len(self.target.inventory.items)
         return 0
+    
     def get_selected_item(self):
         if self.active_side == "left":
             items = self.player.inventory.items
@@ -170,13 +197,16 @@ class UIManager:
         if event.key == pygame.K_j:
             self.open_quests()
             return True
+        if event.key == pygame.K_p:
+            self.open_professions()
+            return True
         return False
 
     def handle_input(self, event):
         if not self.is_open or event.type != pygame.KEYDOWN:
             return None
 
-        if event.key in (pygame.K_ESCAPE, pygame.K_i, pygame.K_TAB, pygame.K_c, pygame.K_k, pygame.K_j):
+        if event.key in (pygame.K_ESCAPE, pygame.K_i, pygame.K_TAB, pygame.K_c, pygame.K_k, pygame.K_j, pygame.K_p):
             self.close()
             return "Окно закрыто"
 
@@ -270,7 +300,6 @@ class UIManager:
                         self.player.inventory.remove_item(item)
                         self.cursor = max(0, min(self.cursor, len(items) - 1))
                         return "Отрицательные эффекты сняты!"
-
                 elif item.type == "book" and item.skill_id and self.player.skills:
                     ok, msg = self.player.skills.learn_skill(item.skill_id)
                     if ok:
@@ -304,14 +333,14 @@ class UIManager:
                 items = self.target.inventory.items
                 if items and self.cursor < len(items):
                     item = items[self.cursor]
-                    ok, msg = Trade.buy_item(self.player.inventory, self.target.inventory, item)
+                    ok, msg = Trade.buy_item(self.player.inventory, self.target.inventory, item, self.player)
                     self.cursor = max(0, min(self.cursor, len(items) - 1))
                     return msg
             elif self.active_side == "left":
                 items = self.player.inventory.items
                 if items and self.cursor < len(items):
                     item = items[self.cursor]
-                    ok, msg = Trade.sell_item(self.player.inventory, self.target.inventory, item)
+                    ok, msg = Trade.sell_item(self.player.inventory, self.target.inventory, item, self.player)
                     self.cursor = max(0, min(self.cursor, len(items) - 1))
                     return msg
 
@@ -327,6 +356,12 @@ class UIManager:
             ok, msg = self.player.skills.forget_skill(self.cursor)
             if ok:
                 self.cursor = max(0, min(self.cursor, len(self.player.skills.learned) - 1))
+                return msg
+
+        elif self.mode == "professions" and getattr(self.player, "professions", None):
+            recs = self.get_available_recipes()
+            if recs and self.cursor < len(recs):
+                _, msg = self.player.professions.craft(recs[self.cursor])
                 return msg
 
         elif self.mode == "dialogue" and self.target:
@@ -346,6 +381,20 @@ class UIManager:
                 ok, msg = self.player.quests.add_quest(new_q)
                 self.dialogue_reply = qd.get("accept_text", "Отлично! Буду ждать тебя с новостями.")
                 self.cursor = 0
+                return msg
+            
+            elif act_id == "learn_prof":
+                teach = dlg.get("teach_profession")
+                p_id = teach["id"]
+                cost = teach.get("cost", 0)
+                if self.player.inventory.gold < cost:
+                    self.dialogue_reply = f"Обучение стоит {cost} золота. Возвращайся, когда накопишь!"
+                    return f"Недостаточно золота (нужно {cost}G)"
+                ok, msg = self.player.professions.learn(p_id, level=1)
+                if ok:
+                    self.player.inventory.gold -= cost
+                    self.dialogue_reply = teach.get("text", "Отлично! Теперь ты знаешь основы этого ремесла. Нажми [P], чтобы открыть верстак.")
+                    self.cursor = 0
                 return msg
 
             elif act_id == "check_quest":
@@ -373,6 +422,7 @@ class UIManager:
                 return "Разговор окончен"
 
         return None
+
     def draw_box(self, surface, rect, title, is_active):
         pygame.draw.rect(surface, (20, 24, 34), rect, border_radius=4)
         border_color = (240, 195, 75) if is_active else (95, 105, 125)
@@ -395,11 +445,14 @@ class UIManager:
             color = (255, 255, 255) if is_sel else (200, 205, 220)
             label = f"{prefix}{item.name}"
             if price_mode == "buy":
-                label = f"{prefix}{item.name}  [{item.value}G]"
+                price = Trade.get_buy_price(self.player, item)
+                label = f"{prefix}{item.name}  [{price}G]"
             elif price_mode == "sell":
-                label = f"{prefix}{item.name}  [{max(1, item.value // 2)}G]"
-            txt = self.font_main.render(label, True, color)
+                price = Trade.get_sell_price(self.player, item)
+                label = f"{prefix}{item.name}  [{price}G]"
+            txt = self.font_main.render(str(label), True, color)
             surface.blit(txt, (rect.x + 16, y))
+
 
     def draw(self, surface):
         if not self.is_open:
@@ -494,6 +547,51 @@ class UIManager:
                     rew = f"Награда: {q.reward_gold}G, {q.reward_xp} XP" + (f" + {ITEMS_DB[q.reward_item].name}" if q.reward_item else "")
                     surface.blit(self.font_small.render(f"   {rew}", True, (140, 210, 255)), (box_rect.x + 25, y + 52))
             hint = "W/S: Выбор задания  |  J / ESC: Закрыть"
+            pygame.draw.rect(surface, (15, 18, 26), (0, WINDOW_HEIGHT - 36, WINDOW_WIDTH, 36))
+            surface.blit(self.font_small.render(hint, True, (230, 230, 230)), (40, WINDOW_HEIGHT - 27))
+            return
+
+        if self.mode == "professions":
+            box_rect = pygame.Rect(220, 60, 840, 560)
+            p_book = getattr(self.player, "professions", None)
+            learned_str = ", ".join(
+                f"{PROFESSIONS_DB[pid].name} (Ур.{info['level']} | {info['xp']}/{info['xp_next']} XP)"
+                for pid, info in p_book.learned.items() if pid in PROFESSIONS_DB
+            ) if (p_book and p_book.learned) else "Нет изученных профессий"
+
+            self.draw_box(surface, box_rect, "ПРОФЕССИИ И РЕМЕСЛО", True)
+            surface.blit(self.font_small.render(f"Ваши навыки: {learned_str}", True, (130, 235, 160)), (box_rect.x + 25, box_rect.y + 52))
+            pygame.draw.line(surface, (80, 90, 110), (box_rect.x + 20, box_rect.y + 80), (box_rect.right - 20, box_rect.y + 80), 1)
+
+            recs = self.get_available_recipes()
+            if not recs:
+                surface.blit(self.font_main.render("Нет доступных рецептов для ваших профессий.", True, (150, 155, 170)), (box_rect.x + 30, box_rect.y + 110))
+            else:
+                for idx, rec in enumerate(recs[:6]):
+                    y = box_rect.y + 92 + idx * 72
+                    is_sel = (self.cursor == idx)
+                    if is_sel:
+                        pygame.draw.rect(surface, (45, 55, 75), (box_rect.x + 15, y - 4, box_rect.width - 30, 62), border_radius=4)
+
+                    res_item = ITEMS_DB.get(rec.result_item_id)
+                    res_name = res_item.name if res_item else rec.result_item_id
+                    prof_name = PROFESSIONS_DB[rec.prof_id].name if rec.prof_id in PROFESSIONS_DB else rec.prof_id
+                    can_make, reason = p_book.can_craft(rec)
+
+                    col = (255, 255, 255) if is_sel else (200, 205, 220)
+                    prefix = "▶ " if is_sel else "  "
+                    surface.blit(self.font_title.render(f"{prefix}{res_name}  [{prof_name} Ур.{rec.req_level}]", True, col), (box_rect.x + 25, y))
+
+                    mats_parts = []
+                    for m_id, req_q in rec.materials.items():
+                        m_name = ITEMS_DB[m_id].name if m_id in ITEMS_DB else m_id
+                        have_q = sum(1 for it in self.player.inventory.items if it.id == m_id)
+                        mats_parts.append(f"{m_name}: {have_q}/{req_q}")
+                    mats_line = "Материалы: " + ", ".join(mats_parts)
+                    st_col = (120, 230, 150) if can_make else (240, 130, 110)
+                    surface.blit(self.font_small.render(f"   {mats_line}   |   {reason}", True, st_col), (box_rect.x + 25, y + 30))
+
+            hint = "W/S: Выбор рецепта  |  Enter: Создать предмет  |  P / ESC: Закрыть"
             pygame.draw.rect(surface, (15, 18, 26), (0, WINDOW_HEIGHT - 36, WINDOW_WIDTH, 36))
             surface.blit(self.font_small.render(hint, True, (230, 230, 230)), (40, WINDOW_HEIGHT - 27))
             return

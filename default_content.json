@@ -455,6 +455,50 @@
       "combat_style": "melee",
       "skill_id": null,
       "sprite_key": null
+    },
+        {
+      "id": "iron_ore",
+      "name": "Железная руда",
+      "item_type": "misc",
+      "value": 12,
+      "stats_bonus": "{}",
+      "description": "Слиток руды для кузнечного дела.",
+      "combat_style": "melee",
+      "skill_id": null,
+      "sprite_key": null
+    },
+    {
+      "id": "wood_log",
+      "name": "Брус дерева",
+      "item_type": "misc",
+      "value": 10,
+      "stats_bonus": "{}",
+      "description": "Крепкая древесина для плотника.",
+      "combat_style": "melee",
+      "skill_id": null,
+      "sprite_key": null
+    },
+    {
+      "id": "herb_leaf",
+      "name": "Целебная трава",
+      "item_type": "misc",
+      "value": 8,
+      "stats_bonus": "{}",
+      "description": "Ароматный лист для алхимика.",
+      "combat_style": "melee",
+      "skill_id": null,
+      "sprite_key": null
+    },
+    {
+      "id": "leather_piece",
+      "name": "Кусок кожи",
+      "item_type": "misc",
+      "value": 10,
+      "stats_bonus": "{}",
+      "description": "Выделанная шкура для брони и сумок.",
+      "combat_style": "melee",
+      "skill_id": null,
+      "sprite_key": null
     }
   ],
   "skills_catalog": [
@@ -727,7 +771,8 @@
       "gold": 300,
       "stats_json": "{\"hp\": 50, \"mp\": 10, \"str\": 2, \"end\": 0}",
       "items_json": "[\"book_whirlwind\", \"book_ice\", \"book_heal\", \"book_blade\", \"fire_staff\", \"hunting_bow\", \"iron_sword\", \"small_bag\", \"potion\", \"mana_potion\", \"speed_potion\", \"shield_potion\", \"antidote\"]",
-      "dialogue_json": "{\"greeting\": \"Лучшие товары во всей округе! Взглянешь на прилавок?\", \"rumor\": \"С монстров у озера падают эссенции редких умений.\"}"
+      "dialogue_json": "{\"greeting\": \"Лучшие товары во всей округе! Взглянешь на прилавок?\", \"rumor\": \"С монстров у озера падают эссенции редких умений.\", \"teach_profession\": {\"id\": \"merchant\", \"cost\": 40, \"text\": \"Секрет торговли прост: покупай дешевле, продавай дороже! Теперь ты знаешь толк в ценах.\"}}"
+
     },
     {
       "id": "free_merchant",
@@ -765,7 +810,7 @@
       "gold": 20,
       "stats_json": "{\"hp\": 70, \"mp\": 30, \"str\": 6, \"vit\": 2, \"end\": 2}",
       "items_json": "[\"iron_sword\", \"chainmail\", \"book_whirlwind\", \"potion\"]",
-      "dialogue_json": "{\"greeting\": \"Стой! На востоке у озера расплодились твари. Поможешь очистить окрестности?\", \"rumor\": \"Говорят, с древних скелетов падают эссенции ледяной магии.\", \"progress_text\": \"Возвращайся, когда одолеешь хотя бы двух монстров у озера.\", \"quest\": {\"id\": \"q_guard_monsters\", \"title\": \"Охота на чудовищ\", \"desc\": \"Победите 2 монстров на востоке площади.\", \"target_type\": \"kill\", \"target_id\": \"monster\", \"count\": 2, \"gold\": 85, \"xp\": 120, \"item\": \"book_heal\", \"accept_text\": \"Отлично! Призови их [M] или найди у озера. Награда ждет!\", \"complete_text\": \"Славная охота! Вот твое золото и книга исцеления.\"}}"
+      "dialogue_json": "{\"greeting\": \"Стой! На востоке у озера расплодились твари. Поможешь очистить окрестности?\", \"rumor\": \"Говорят, с древних скелетов падают эссенции ледяной магии.\", \"progress_text\": \"Возвращайся, когда одолеешь хотя бы двух монстров у озера.\", \"teach_profession\": {\"id\": \"blacksmith\", \"cost\": 50, \"text\": \"Я научил тебя основам ковки клинков и лат. Открой книгу ремесел [P]!\"}, \"quest\": {\"id\": \"q_guard_monsters\", \"title\": \"Охота на чудовищ\", \"desc\": \"Победите 2 монстров на востоке площади.\", \"target_type\": \"kill\", \"target_id\": \"monster\", \"count\": 2, \"gold\": 85, \"xp\": 120, \"item\": \"book_heal\", \"accept_text\": \"Отлично! Призови их [M] или найди у озера. Награда ждет!\", \"complete_text\": \"Славная охота! Вот твое золото и книга исцеления.\"}}"
     },
     {
       "id": "town_adventurer",
@@ -784,7 +829,7 @@
       "gold": 40,
       "stats_json": "{\"hp\": 55, \"mp\": 40, \"str\": 4, \"agi\": 4, \"int\": 4, \"vit\": 2, \"end\": 1}",
       "items_json": "[\"rusty_sword\", \"book_ice\", \"potion\"]",
-      "dialogue_json": "{\"greeting\": \"Привет, коллега! Ищешь приключения или редкие трофеи?\", \"rumor\": \"Если не успеешь забрать лут — я подберу его сам!\"}"
+      "dialogue_json": "{\"greeting\": \"Привет, коллега! Ищешь приключения или редкие трофеи?\", \"rumor\": \"Если не успеешь забрать лут — я подберу его сам!\", \"teach_profession\": {\"id\": \"carpenter\", \"cost\": 35, \"text\": \"В походах без умения чинить луки и шить сумки никуда. Пользуйся [P]!\"}}"
     },
     {
       "id": "lake_goblin",
@@ -824,5 +869,20 @@
       "items_json": "[\"leather_armor\", \"book_skin\", \"book_mana\"]",
       "dialogue_json": null
     }
+  ],
+  "professions_catalog": [
+    {"id": "blacksmith", "name": "Кузнец", "desc": "Ковка железного оружия и прочной брони.", "bonus_type": "craft"},
+    {"id": "carpenter", "name": "Плотник", "desc": "Изготовление луков, посохов и походных сумок.", "bonus_type": "craft"},
+    {"id": "alchemist", "name": "Алхимик", "desc": "Варка целебных, магических и усиливающих зелий.", "bonus_type": "craft"},
+    {"id": "merchant", "name": "Торговец", "desc": "Выгодные цены при покупке (-15%) и продаже (+20%).", "bonus_type": "trade"}
+  ],
+  "recipes_catalog": [
+    {"id": "rec_iron_sword", "prof_id": "blacksmith", "result_item_id": "iron_sword", "req_level": 1, "materials_json": "{\"iron_ore\": 2, \"wood_log\": 1}", "xp_gain": 35},
+    {"id": "rec_chainmail", "prof_id": "blacksmith", "result_item_id": "chainmail", "req_level": 1, "materials_json": "{\"iron_ore\": 3, \"leather_piece\": 1}", "xp_gain": 40},
+    {"id": "rec_hunting_bow", "prof_id": "carpenter", "result_item_id": "hunting_bow", "req_level": 1, "materials_json": "{\"wood_log\": 2, \"leather_piece\": 1}", "xp_gain": 30},
+    {"id": "rec_small_bag", "prof_id": "carpenter", "result_item_id": "small_bag", "req_level": 1, "materials_json": "{\"leather_piece\": 2}", "xp_gain": 25},
+    {"id": "rec_potion", "prof_id": "alchemist", "result_item_id": "potion", "req_level": 1, "materials_json": "{\"herb_leaf\": 2}", "xp_gain": 20},
+    {"id": "rec_speed_potion", "prof_id": "alchemist", "result_item_id": "speed_potion", "req_level": 1, "materials_json": "{\"herb_leaf\": 2, \"wood_log\": 1}", "xp_gain": 25}
   ]
+
 }

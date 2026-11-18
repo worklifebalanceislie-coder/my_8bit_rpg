@@ -4,6 +4,7 @@ import random
 from items import ITEMS_DB, SKILL_TO_ESSENCE
 from factions import are_hostile
 from components.effects import StatusEffects
+from components.professions import ProfessionBook
 
 class Entity:
     def __init__(self, name, x, y, color, sprite=None, is_container=False, faction="neutral", sprite_bank=None):
@@ -23,6 +24,7 @@ class Entity:
         self.last_attacker = None
         self.speech_text = ""
         self.speech_timer = 0.0
+        self.professions = ProfessionBook(self)
 
         # Подключаемые модули
         self.movement = None
