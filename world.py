@@ -35,6 +35,8 @@ class WorldMap:
         self.entities = []
         self.projectiles = []
         self.build_town_square()
+        self.buildings = []
+
 
     def draw_speeches(self, screen, camera, scale, speech_font):
         if not speech_font:
@@ -146,6 +148,7 @@ class WorldMap:
         start_r = max(0, camera.offset_y // TILE_SIZE)
         end_r = min(self.rows, (camera.offset_y + NATIVE_HEIGHT) // TILE_SIZE + 2)
 
+        # 1. Сначала рисуем землю, воду и дороги
         for r in range(start_r, end_r):
             for c in range(start_c, end_c):
                 tile_key = self.tiles[r][c]
@@ -153,30 +156,38 @@ class WorldMap:
                 if spr:
                     surface.blit(spr, (c * TILE_SIZE - camera.offset_x, r * TILE_SIZE - camera.offset_y))
 
+        # 2. Пустые участки под постройку
         for idx, plot in enumerate(self.building_plots):
             r_scr = camera.apply_rect(plot)
             pygame.draw.rect(surface, (160, 140, 100), r_scr, 1)
-            if speech_font:
-                lbl = speech_font.render(f"Место под дом #{idx + 1}", False, (210, 195, 155))
-                surface.blit(lbl, (r_scr.x + 4, r_scr.y + 4))
 
-        # Отрисовка всех сущностей с учетом смещения камеры
-        for ent in sorted(self.entities, key=lambda e: e.rect.bottom):
-            orig_pos = ent.rect.topleft
-            ent.rect.x -= camera.offset_x
-            ent.rect.y -= camera.offset_y
-            if ent.combat and ent.combat.swing_rect:
-                ent.combat.swing_rect.x -= camera.offset_x
-                ent.combat.swing_rect.y -= camera.offset_y
+        # 3. Здания и персонажи вместе (сортировка по нижней грани для глубины)
+        renderables = []
+        for bld in getattr(self, "buildings", []):
+            renderables.append((bld.rect.bottom, "building", bld))
+        for ent in self.entities:
+            renderables.append((ent.rect.bottom, "entity", ent))
+        renderables.sort(key=lambda item: item[0])
 
-            ent.draw(surface, None)
+        for _, r_type, obj in renderables:
+            if r_type == "building":
+                surface.blit(obj.sprite, (obj.rect.x - camera.offset_x, obj.rect.y - camera.offset_y))
+            else:
+                orig_pos = obj.rect.topleft
+                obj.rect.x -= camera.offset_x
+                obj.rect.y -= camera.offset_y
+                if obj.combat and obj.combat.swing_rect:
+                    obj.combat.swing_rect.x -= camera.offset_x
+                    obj.combat.swing_rect.y -= camera.offset_y
 
-            ent.rect.topleft = orig_pos
-            if ent.combat and ent.combat.swing_rect:
-                ent.combat.swing_rect.x += camera.offset_x
-                ent.combat.swing_rect.y += camera.offset_y
+                obj.draw(surface, None)
 
-        # Отрисовка всех снарядов с учетом смещения камеры
+                obj.rect.topleft = orig_pos
+                if obj.combat and obj.combat.swing_rect:
+                    obj.combat.swing_rect.x += camera.offset_x
+                    obj.combat.swing_rect.y += camera.offset_y
+
+        # 4. Снаряды и магия
         for proj in self.projectiles:
             proj.pos_x -= camera.offset_x
             proj.pos_y -= camera.offset_y

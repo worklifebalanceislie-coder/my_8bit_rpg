@@ -49,6 +49,10 @@ class UIManager:
         self.drag_start_pos = None
         self.ctx_menu = None        # {'rect': Rect, 'options': [(act_id, label), ...], 'side': str, 'index': int, 'slot': str|None}
         self.sprites = sprites or {}
+        self.left_scroll = 0
+        self.right_scroll = 0
+        self.single_scroll = 0
+
 
     def open_inventory(self):
         self.is_open = True
@@ -56,6 +60,7 @@ class UIManager:
         self.target = None
         self.active_side = "left"
         self.cursor = 0
+        self.left_scroll = self.right_scroll = self.single_scroll = 0
 
     def open_stats(self):
         self.is_open = True
@@ -70,6 +75,7 @@ class UIManager:
         self.target = None
         self.active_side = "left"
         self.cursor = 0
+        self.left_scroll = self.right_scroll = self.single_scroll = 0
 
     def open_quests(self):
         self.is_open = True
@@ -77,6 +83,7 @@ class UIManager:
         self.target = None
         self.active_side = "left"
         self.cursor = 0
+        self.left_scroll = self.right_scroll = self.single_scroll = 0
 
     def open_professions(self):
         self.is_open = True
@@ -84,6 +91,7 @@ class UIManager:
         self.target = None
         self.active_side = "left"
         self.cursor = 0
+        self.left_scroll = self.right_scroll = self.single_scroll = 0
 
     def get_available_recipes(self):
         if not getattr(self.player, "professions", None):
@@ -104,6 +112,7 @@ class UIManager:
         self.target = target
         self.active_side = "right"
         self.cursor = 0
+        self.left_scroll = self.right_scroll = self.single_scroll = 0.
         if mode == "chest" and target.inventory and target.inventory.gold > 0:
             gold = target.inventory.gold
             if self.player.skills and self.player.skills.has_skill("race_goblin"):
@@ -307,10 +316,22 @@ class UIManager:
 
         # 2. Прокрутка колесиком
         if event.type == pygame.MOUSEWHEEL:
-            max_len = self.get_current_list_len()
-            if max_len > 0:
-                self.cursor = (self.cursor - event.y) % max_len
+            mx, my = pygame.mouse.get_pos()
+            if self.mode in ("inventory", "chest", "trade"):
+                left_rect = pygame.Rect(40, 35, 580, 460)
+                right_rect = pygame.Rect(660, 35, 580, 460)
+                if left_rect.collidepoint(mx, my):
+                    max_s = max(0, len(self.player.inventory.items) - 12)
+                    self.left_scroll = max(0, min(max_s, self.left_scroll - event.y))
+                elif right_rect.collidepoint(mx, my) and self.mode in ("chest", "trade") and self.target:
+                    max_s = max(0, len(self.target.inventory.items) - 12)
+                    self.right_scroll = max(0, min(max_s, self.right_scroll - event.y))
+            else:
+                max_len = self.get_current_list_len()
+                if max_len > 0:
+                    self.cursor = (self.cursor - event.y) % max_len
             return None
+
 
         mx, my = event.pos
 
@@ -392,11 +413,15 @@ class UIManager:
             # Левая колонка (Рюкзак игрока)
             if left_rect.collidepoint(mx, my):
                 items = self.player.inventory.items
-                for idx, item in enumerate(items):
-                    row_y = left_rect.y + 56 + idx * 32
+                for vis_i in range(12):
+                    idx = self.left_scroll + vis_i
+                    if idx >= len(items):
+                        break
+                    row_y = left_rect.y + 56 + vis_i * 32
                     if row_y - 4 <= my <= row_y + 24:
                         self.active_side = "left"
                         self.cursor = idx
+                        item = items[idx]
                         if event.type == pygame.MOUSEBUTTONDOWN:
                             if event.button == 1:
                                 self.drag_item = {"side": "left", "index": idx, "item": item, "slot": None}
@@ -424,11 +449,15 @@ class UIManager:
                             break
                 elif self.target and self.target.inventory:
                     t_items = self.target.inventory.items
-                    for idx, item in enumerate(t_items):
-                        row_y = right_rect.y + 56 + idx * 32
+                    for vis_i in range(12):
+                        idx = self.right_scroll + vis_i
+                        if idx >= len(t_items):
+                            break
+                        row_y = right_rect.y + 56 + vis_i * 32
                         if row_y - 4 <= my <= row_y + 24:
                             self.active_side = "right"
                             self.cursor = idx
+                            item = t_items[idx]
                             if event.type == pygame.MOUSEBUTTONDOWN:
                                 if event.button == 1:
                                     self.drag_item = {"side": "right", "index": idx, "item": item, "slot": None}
@@ -703,27 +732,70 @@ class UIManager:
         surface.blit(title_surf, (rect.x + 16, rect.y + 12))
         pygame.draw.line(surface, border_color, (rect.x + 10, rect.y + 44), (rect.right - 10, rect.y + 44), 2)
 
+    def draw_scrollbar(self, surface, rect, total_items, visible_items, scroll_offset):
+        if total_items <= visible_items:
+            return
+        track_x = rect.right - 10
+        track_y = rect.y + 52
+        track_h = rect.height - 62
+        pygame.draw.rect(surface, (35, 42, 56), (track_x, track_y, 5, track_h), border_radius=2)
+
+        thumb_h = max(20, int(track_h * (visible_items / total_items)))
+        max_scroll = max(1, total_items - visible_items)
+        thumb_y = track_y + int((track_h - thumb_h) * (scroll_offset / max_scroll))
+        pygame.draw.rect(surface, (240, 195, 75), (track_x, thumb_y, 5, thumb_h), border_radius=2)
+
     def draw_item_list(self, surface, rect, items, side, price_mode=None):
         if not items:
             empty_surf = self.font_main.render("(пусто)", True, (130, 135, 150))
             surface.blit(empty_surf, (rect.x + 20, rect.y + 60))
             return
-        for idx, item in enumerate(items):
-            y = rect.y + 56 + idx * 32
+
+        visible_rows = 12
+        scroll = self.left_scroll if side == "left" else self.right_scroll
+
+        if self.active_side == side:
+            if self.cursor < scroll:
+                scroll = self.cursor
+            elif self.cursor >= scroll + visible_rows:
+                scroll = self.cursor - visible_rows + 1
+
+        max_scroll = max(0, len(items) - visible_rows)
+        scroll = max(0, min(max_scroll, scroll))
+        if side == "left":
+            self.left_scroll = scroll
+        else:
+            self.right_scroll = scroll
+
+        surface.set_clip(pygame.Rect(rect.x + 4, rect.y + 48, rect.width - 18, rect.height - 54))
+
+        for vis_i in range(visible_rows):
+            idx = scroll + vis_i
+            if idx >= len(items):
+                break
+            item = items[idx]
+            y = rect.y + 56 + vis_i * 32
             is_sel = (self.active_side == side and self.cursor == idx)
             if is_sel:
-                pygame.draw.rect(surface, (45, 55, 75), (rect.x + 10, y - 4, rect.width - 20, 28), border_radius=3)
+                pygame.draw.rect(surface, (45, 55, 75), (rect.x + 10, y - 4, rect.width - 26, 28), border_radius=3)
+
             prefix = "> " if is_sel else "  "
             color = (255, 255, 255) if is_sel else (200, 205, 220)
-            label = f"{prefix}{item.name}"
+            name_str = item.name[:26] + ".." if len(item.name) > 28 else item.name
+            label = f"{prefix}{name_str}"
+
             if price_mode == "buy":
                 price = Trade.get_buy_price(self.player, item)
-                label = f"{prefix}{item.name}  [{price}G]"
+                label = f"{prefix}{name_str} [{price}G]"
             elif price_mode == "sell":
                 price = Trade.get_sell_price(self.player, item)
-                label = f"{prefix}{item.name}  [{price}G]"
+                label = f"{prefix}{name_str} [{price}G]"
+
             txt = self.font_main.render(str(label), True, color)
             surface.blit(txt, (rect.x + 16, y))
+
+        surface.set_clip(None)
+        self.draw_scrollbar(surface, rect, len(items), visible_rows, scroll)
 
     def draw(self, surface):
         if not self.is_open:

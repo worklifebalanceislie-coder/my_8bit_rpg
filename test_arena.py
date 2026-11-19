@@ -19,6 +19,7 @@ from components.ai import AIController
 from items import ITEMS_DB
 from appearance import build_character_sprite, generate_random_appearance
 from monster_gen import generate_monster
+from building_gen import generate_building
 
 
 def build_showcase_map(world):
@@ -186,6 +187,17 @@ def populate_showcase_world(world, player, sprites, db):
         mob = generate_monster(mx, my, sprites, db=db)
         world.entities.append(mob)
 
+    # 6. ГЕНЕРАЦИЯ ЗДАНИЙ ЛЮДЕЙ НА СЕВЕРНОЙ ПЛОЩАДИ
+    world.buildings = [
+        generate_building(tile_x=11, tile_y=2, kind="tavern", size="large"),
+        generate_building(tile_x=19, tile_y=2, kind="smithy", size="medium"),
+        generate_building(tile_x=4,  tile_y=2, kind="shop",   size="medium"),
+        generate_building(tile_x=24, tile_y=3, kind="house",  size="small"),
+    ]
+    for bld in world.buildings:
+        world.walls.extend(bld.wall_rects)
+
+
 def run_test_arena():
     pygame.init()
     screen = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT))
@@ -226,6 +238,10 @@ def run_test_arena():
 
             if ui.handle_global_hotkey(event):
                 continue
+            for bld in getattr(world, "buildings", []):
+                if player.rect.colliderect(bld.door_rect):
+                    status_msg = f"Дверь: {bld.name} [{bld.meta['size']}, крыша: {bld.meta['roof_style']}] (интерьер в разработке)"
+                    break
 
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
@@ -248,6 +264,23 @@ def run_test_arena():
                     mob = generate_monster(35 * TILE_SIZE, 12 * TILE_SIZE, sprites, db=db)
                     world.entities.append(mob)
                     status_msg = f"F3: На арене появился {mob.name}!"
+                elif event.key == pygame.K_F4:
+                    # Перестраиваем здания с новыми случайными формами и крышами
+                    world.buildings = [
+                        generate_building(tile_x=11, tile_y=2, kind="tavern", size="large"),
+                        generate_building(tile_x=19, tile_y=2, kind="smithy", size="medium"),
+                        generate_building(tile_x=4,  tile_y=2, kind="shop",   size="medium"),
+                        generate_building(tile_x=24, tile_y=3, kind="house",  size="small"),
+                    ]
+                    world.walls = [
+                        pygame.Rect(c * TILE_SIZE, r * TILE_SIZE, TILE_SIZE, TILE_SIZE)
+                        for r in range(world.rows) for c in range(world.cols)
+                        if world.tiles[r][c] in ("wall", "water")
+                    ]
+                    for bld in world.buildings:
+                        world.walls.extend(bld.wall_rects)
+                    status_msg = "F4: Архитектура всех зданий перегенерирована!"
+
                 elif event.key in (pygame.K_1, pygame.K_2, pygame.K_3, pygame.K_4, pygame.K_5, pygame.K_6) and player.skills:
                     slot_idx = event.key - pygame.K_1
                     mx, my = pygame.mouse.get_pos()
