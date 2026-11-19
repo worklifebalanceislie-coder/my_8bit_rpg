@@ -12,6 +12,8 @@ class Entity:
         self.rect = pygame.Rect(x, y, 12, 12)
         self.color = color
         self.sprite = sprite
+        self.sprite_key = None
+        self.appearance = None
         self.sprite_bank = sprite_bank
         self.facing_left = False
         self.facing_dir = (1.0, 0.0)
@@ -25,6 +27,8 @@ class Entity:
         self.speech_text = ""
         self.speech_timer = 0.0
         self.professions = ProfessionBook(self)
+        self.quick_items = [None, None, None, None]  # 4 слота быстрого доступа (Q, F, Z, X)
+
 
         # Подключаемые модули
         self.movement = None
@@ -38,7 +42,45 @@ class Entity:
         self.quests = None
         self.dialogue = None
         self.ai = None
+    
+    def use_quick_item(self, slot_idx):
+        if not self.inventory or slot_idx < 0 or slot_idx >= len(self.quick_items):
+            return None
+        item_id = self.quick_items[slot_idx]
+        if not item_id:
+            return None
 
+        target_item = next((it for it in self.inventory.items if it.id == item_id), None)
+        if not target_item:
+            return "Предмет закончился в рюкзаке!"
+
+        if target_item.type == "consumable":
+            if "heal" in target_item.stats_bonus:
+                heal = target_item.stats_bonus["heal"]
+                self.stats.hp = min(float(self.stats.max_hp), self.stats.hp + heal)
+                self.inventory.remove_item(target_item)
+                return f"Использовано: {target_item.name} (+{heal} HP)"
+            elif "mana" in target_item.stats_bonus:
+                mana = target_item.stats_bonus["mana"]
+                self.stats.mp = min(float(self.stats.max_mp), self.stats.mp + mana)
+                self.inventory.remove_item(target_item)
+                return f"Использовано: {target_item.name} (+{mana} MP)"
+            elif "effect" in target_item.stats_bonus and self.effects:
+                eff_id = target_item.stats_bonus["effect"]
+                dur = 12.0 if eff_id == "shield" else 8.0
+                self.effects.apply(eff_id, dur, power=1)
+                self.inventory.remove_item(target_item)
+                return f"Использовано: {target_item.name}"
+            elif target_item.stats_bonus.get("cure") and self.effects:
+                self.effects.remove("poison")
+                self.effects.remove("burn")
+                self.inventory.remove_item(target_item)
+                return "Отрицательные эффекты сняты!"
+            elif "expand_skill_slots" in target_item.stats_bonus and self.skills:
+                new_lim = self.skills.expand_active_slots(target_item.stats_bonus["expand_skill_slots"])
+                self.inventory.remove_item(target_item)
+                return f"Слоты активных навыков расширены до {new_lim}!"
+        return f"{target_item.name}: нельзя быстро применить"
 
     def say(self, text, duration=2.0):
         self.speech_text = text
@@ -169,8 +211,13 @@ class Entity:
         return bag
 
     def build_animated_sprite(self):
+        if self.appearance and self.sprite is None:
+            from appearance import build_character_sprite
+            self.sprite = build_character_sprite(self.appearance)
+
         composite = pygame.Surface((20, 18), pygame.SRCALPHA)
         body = self.sprite.copy()
+
 
         if self.equipment and self.sprite_bank:
             armor = self.equipment.slots.get("armor")
@@ -249,6 +296,16 @@ class Entity:
             pygame.draw.rect(surface, (20, 20, 20), (self.rect.x - 1, self.rect.y - 8, bar_w, 3))
             pygame.draw.rect(surface, (220, 50, 50), (self.rect.x - 1, self.rect.y - 8, int(bar_w * hp_ratio), 3))
 
-        if self.speech_text and font:
-            txt = font.render(self.speech_text, False, (255, 240, 150))
-            surface.blit(txt, (self.rect.centerx - txt.get_width() // 2, self.rect.y - 16))
+    def draw_speech(self, screen, camera, scale, font):
+        if not font or not self.speech_text or self.speech_timer <= 0:
+            return
+        txt_surf = font.render(self.speech_text, True, (255, 250, 210))
+        scr_cx = (self.rect.centerx - camera.offset_x) * scale
+        scr_top = (self.rect.y - camera.offset_y) * scale
+        tx = int(scr_cx - txt_surf.get_width() // 2)
+        ty = int(scr_top - 22 - txt_surf.get_height())
+
+        bg_rect = pygame.Rect(tx - 6, ty - 3, txt_surf.get_width() + 12, txt_surf.get_height() + 6)
+        pygame.draw.rect(screen, (18, 22, 30), bg_rect, border_radius=4)
+        pygame.draw.rect(screen, (90, 105, 130), bg_rect, 1, border_radius=4)
+        screen.blit(txt_surf, (tx, ty))

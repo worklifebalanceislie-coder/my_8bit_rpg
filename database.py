@@ -158,6 +158,12 @@ class DatabaseManager:
 
         cur.execute("CREATE TABLE IF NOT EXISTS game_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)")
         self.conn.commit()
+
+        try:
+            cur.execute("ALTER TABLE skills_catalog ADD COLUMN sprite_key TEXT")
+        except Exception:
+            pass
+
     
     def sync_all_catalogs(self):
         cur = self.conn.cursor()
@@ -214,7 +220,7 @@ class DatabaseManager:
         cur.execute("SELECT * FROM skills_catalog")
         SKILLS_DB.clear()
         for r in cur.fetchall():
-            SKILLS_DB[r["id"]] = Skill(r["id"], r["name"], r["kind"], r["mana_cost"], r["cooldown"], r["desc"])
+            SKILLS_DB[r["id"]] = Skill(r["id"], r["name"], r["kind"], r["mana_cost"], r["cooldown"], r["desc"], r["sprite_key"])
 
     def load_factions_to_memory(self):
         from factions import FACTION_NAMES_RU, HOSTILE_PAIRS
@@ -276,6 +282,23 @@ class DatabaseManager:
                     ent.inventory.add_item(ITEMS_DB[item_id])
 
             st_data = json.loads(r["stats_json"])
+            app_cfg = st_data.get("appearance")
+            if not bool(r["is_container"]):
+                from appearance import build_character_sprite, generate_random_appearance
+                app_cfg = st_data.get("appearance")
+                if isinstance(app_cfg, dict):
+                    ent.appearance = app_cfg
+                else:
+                    # Определяем расу по фракции НПС и генерируем ему живую внешность
+                    fac_to_race = {"monster": "goblin", "undead": "skeleton"}
+                    r_id = fac_to_race.get(r["faction"], "human")
+                    ent.appearance = generate_random_appearance(r_id)
+                    # Для стражника зададим солидный стеганый кафтан и алый цвет мундира
+                    if r["role"] == "guard":
+                        ent.appearance["body"] = "heavy_tunic"
+                        ent.appearance["cloth_color"] = 2
+                ent.sprite = build_character_sprite(ent.appearance)
+
             if st_data:
                 ent.equipment = Equipment()
                 ent.stats = Stats(
@@ -346,8 +369,8 @@ class DatabaseManager:
                 for q in ent.quests.quests
             ] if ent.quests else None,
             "effects": [{"id": e.id, "duration": e.duration, "power": e.power} for e in ent.effects.active] if getattr(ent, "effects", None) else [],
-            "professions": ent.professions.learned if getattr(ent, "professions", None) else {}
-
+            "professions": ent.professions.learned if getattr(ent, "professions", None) else {},
+            "appearance": getattr(ent, "appearance", None),
         }
         return json.dumps(data, ensure_ascii=False)
 
@@ -366,6 +389,10 @@ class DatabaseManager:
         data = json.loads(row["data_json"])
         ent.facing_left = data.get("facing_left", False)
         ent.dialogue = data.get("dialogue")
+        ent.appearance = data.get("appearance")
+        if ent.appearance:
+            from appearance import build_character_sprite
+            ent.sprite = build_character_sprite(ent.appearance)
 
         if data["movement"]:
             ent.movement = Movement(ent, speed=data["movement"]["speed"])

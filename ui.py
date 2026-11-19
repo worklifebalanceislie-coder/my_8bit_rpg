@@ -6,6 +6,7 @@ from components.quests import Quest
 from entities import Entity
 from items import ITEMS_DB
 from components.professions import PROFESSIONS_DB, RECIPES_DB
+from hud import get_quick_slot_rects, draw_quick_items_bar
 
 SLOT_NAMES_RU = {
     "weapon": "Оружие",
@@ -31,7 +32,7 @@ TYPE_NAMES_RU = {
 }
 
 class UIManager:
-    def __init__(self, player, entities=None, loot_sprite=None):
+    def __init__(self, player, entities=None, loot_sprite=None, sprites=None):
         self.player = player
         self.entities = entities
         self.loot_sprite = loot_sprite
@@ -44,6 +45,10 @@ class UIManager:
         self.font_title = pygame.font.SysFont("consolas", 24, bold=True)
         self.font_main = pygame.font.SysFont("consolas", 20)
         self.font_small = pygame.font.SysFont("consolas", 18)
+        self.drag_item = None       # {'side': 'left'|'right', 'index': int, 'item': Item, 'slot': str|None}
+        self.drag_start_pos = None
+        self.ctx_menu = None        # {'rect': Rect, 'options': [(act_id, label), ...], 'side': str, 'index': int, 'slot': str|None}
+        self.sprites = sprites or {}
 
     def open_inventory(self):
         self.is_open = True
@@ -110,6 +115,8 @@ class UIManager:
         self.is_open = False
         self.mode = None
         self.target = None
+        self.drag_item = None
+        self.ctx_menu = None
 
     def get_dialogue_options(self):
         npc = self.target
@@ -203,7 +210,13 @@ class UIManager:
         return False
 
     def handle_input(self, event):
-        if not self.is_open or event.type != pygame.KEYDOWN:
+        if not self.is_open:
+            return None
+
+        if event.type in (pygame.MOUSEMOTION, pygame.MOUSEBUTTONDOWN, pygame.MOUSEBUTTONUP, pygame.MOUSEWHEEL):
+            return self.handle_mouse_input(event)
+
+        if event.type != pygame.KEYDOWN:
             return None
 
         if event.key in (pygame.K_ESCAPE, pygame.K_i, pygame.K_TAB, pygame.K_c, pygame.K_k, pygame.K_j, pygame.K_p):
@@ -229,6 +242,260 @@ class UIManager:
 
         if event.key in (pygame.K_x, pygame.K_DELETE):
             return self.drop_selected_item()
+
+        return None
+
+    def open_context_menu(self, pos, side, idx, item, slot_name=None):
+        opts = []
+        if self.mode == "inventory":
+            if side == "left" and item:
+                if item.type in self.player.equipment.slots:
+                    opts.append(("equip", "Надеть"))
+                elif item.type == "consumable":
+                    opts.append(("use", "Выпить / Использовать"))
+                elif item.type == "book":
+                    opts.append(("use", "Прочитать книгу"))
+                opts.append(("drop", "Выбросить на землю"))
+            elif side == "right" and slot_name and item:
+                opts.append(("unequip", "Снять в рюкзак"))
+        elif self.mode == "chest" and item:
+            opts.append(("transfer", "Положить в сундук" if side == "left" else "Взять в рюкзак"))
+            if side == "left":
+                opts.append(("drop", "Выбросить на землю"))
+        elif self.mode == "trade" and item:
+            opts.append(("trade", "Продать предмет" if side == "left" else "Купить предмет"))
+
+        if not opts:
+            return
+        mx, my = pos
+        w = 220
+        h = len(opts) * 32 + 12
+        if mx + w > WINDOW_WIDTH:
+            mx -= w
+        if my + h > WINDOW_HEIGHT:
+            my -= h
+        self.ctx_menu = {"rect": pygame.Rect(mx, my, w, h), "options": opts, "side": side, "index": idx, "slot": slot_name}
+
+    def execute_context_action(self, act_id):
+        ctx = self.ctx_menu
+        self.ctx_menu = None
+        if not ctx:
+            return None
+        self.active_side = ctx["side"]
+        self.cursor = ctx["index"]
+
+        if act_id in ("equip", "use", "unequip", "transfer", "trade"):
+            return self.perform_action()
+        elif act_id == "drop":
+            return self.drop_selected_item()
+        return None
+
+    def handle_mouse_input(self, event):
+        # 1. Если открыто контекстное меню ПКМ — обрабатываем клик по нему
+        if self.ctx_menu:
+            mx, my = pygame.mouse.get_pos()
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                if event.button == 1 and self.ctx_menu["rect"].collidepoint(mx, my):
+                    rel_y = my - (self.ctx_menu["rect"].y + 6)
+                    opt_idx = rel_y // 32
+                    if 0 <= opt_idx < len(self.ctx_menu["options"]):
+                        act_id, _ = self.ctx_menu["options"][opt_idx]
+                        return self.execute_context_action(act_id)
+                self.ctx_menu = None
+                return None
+            return None
+
+        # 2. Прокрутка колесиком
+        if event.type == pygame.MOUSEWHEEL:
+            max_len = self.get_current_list_len()
+            if max_len > 0:
+                self.cursor = (self.cursor - event.y) % max_len
+            return None
+
+        mx, my = event.pos
+
+        # 3. ДВУХПАНЕЛЬНЫЕ ОКНА (Инвентарь, Сундук, Торговля)
+        if self.mode in ("inventory", "chest", "trade"):
+            left_rect = pygame.Rect(40, 35, 580, 460)
+            right_rect = pygame.Rect(660, 35, 580, 460)
+            quick_box = pygame.Rect(820, 515, 420, 145)
+
+            # Отпускание ЛКМ (Завершение перетаскивания Drag & Drop)
+            if event.type == pygame.MOUSEBUTTONUP and event.button == 1 and self.drag_item:
+                drag = self.drag_item
+                self.drag_item = None
+                if self.drag_start_pos:
+                    sx, sy = self.drag_start_pos
+                    if abs(mx - sx) < 6 and abs(my - sy) < 6:
+                        return None
+
+                # А. Проверяем слоты быстрой панели в инвентаре
+                if self.mode == "inventory":
+                    q_rects = get_quick_slot_rects(self.player, in_inventory=True)
+                    if drag["side"] == "quick":
+                        for q_idx, q_rect in enumerate(q_rects):
+                            if q_rect.collidepoint(mx, my):
+                                old_id = self.player.quick_items[q_idx]
+                                self.player.quick_items[q_idx] = drag["item"].id
+                                self.player.quick_items[drag["index"]] = old_id
+                                return "Слоты быстрой панели поменяны местами"
+                        self.player.quick_items[drag["index"]] = None
+                        return "Предмет убран с быстрой панели"
+
+                    if drag["side"] == "left":
+                        for q_idx, q_rect in enumerate(q_rects):
+                            if q_rect.collidepoint(mx, my):
+                                if drag["item"].type != "consumable":
+                                    return "На быструю панель можно ставить только расходники!"
+                                self.player.quick_items[q_idx] = drag["item"].id
+                                keys_ru = ["Q", "F", "Z", "X"]
+                                return f"'{drag['item'].name}' назначен на клавишу [{keys_ru[q_idx]}]"
+
+                # Б. Перенос между колонками или выброс на землю
+                if drag["side"] == "left":
+                    if right_rect.collidepoint(mx, my):
+                        self.active_side = "left"
+                        self.cursor = drag["index"]
+                        return self.perform_action()
+                    elif not left_rect.collidepoint(mx, my):
+                        self.active_side = "left"
+                        self.cursor = drag["index"]
+                        return self.drop_selected_item()
+
+                elif drag["side"] == "right" and left_rect.collidepoint(mx, my):
+                    self.active_side = "right"
+                    self.cursor = drag["index"]
+                    return self.perform_action()
+
+                return None
+
+            # Клик по слотам быстрой панели в инвентаре
+            if self.mode == "inventory" and event.type == pygame.MOUSEBUTTONDOWN:
+                for q_idx, q_rect in enumerate(get_quick_slot_rects(self.player, in_inventory=True)):
+                    if q_rect.collidepoint(mx, my):
+                        q_id = self.player.quick_items[q_idx]
+                        if event.button == 1 and q_id and q_id in ITEMS_DB:
+                            self.drag_item = {"side": "quick", "index": q_idx, "item": ITEMS_DB[q_id], "slot": None}
+                            self.drag_start_pos = (mx, my)
+                        elif event.button == 3 and q_id:
+                            self.player.quick_items[q_idx] = None
+                            return "Слот быстрой панели очищен"
+                        return None
+
+            # Клик мимо всех окон закрывает интерфейс
+            if event.type == pygame.MOUSEBUTTONDOWN and event.button in (1, 3):
+                in_quick = (self.mode == "inventory" and quick_box.collidepoint(mx, my))
+                if not left_rect.collidepoint(mx, my) and not right_rect.collidepoint(mx, my) and not in_quick:
+                    self.close()
+                    return "Окно закрыто"
+
+            # Левая колонка (Рюкзак игрока)
+            if left_rect.collidepoint(mx, my):
+                items = self.player.inventory.items
+                for idx, item in enumerate(items):
+                    row_y = left_rect.y + 56 + idx * 32
+                    if row_y - 4 <= my <= row_y + 24:
+                        self.active_side = "left"
+                        self.cursor = idx
+                        if event.type == pygame.MOUSEBUTTONDOWN:
+                            if event.button == 1:
+                                self.drag_item = {"side": "left", "index": idx, "item": item, "slot": None}
+                                self.drag_start_pos = (mx, my)
+                            elif event.button == 3:
+                                self.open_context_menu((mx, my), "left", idx, item)
+                        break
+
+            # Правая колонка (Экипировка / Сундук / Торговец)
+            elif right_rect.collidepoint(mx, my):
+                if self.mode == "inventory":
+                    slot_keys = list(self.player.equipment.slots.keys())
+                    for idx, s_key in enumerate(slot_keys):
+                        row_y = right_rect.y + 56 + idx * 32
+                        if row_y - 4 <= my <= row_y + 24:
+                            self.active_side = "right"
+                            self.cursor = idx
+                            eq_item = self.player.equipment.slots[s_key]
+                            if event.type == pygame.MOUSEBUTTONDOWN and eq_item:
+                                if event.button == 1:
+                                    self.drag_item = {"side": "right", "index": idx, "item": eq_item, "slot": s_key}
+                                    self.drag_start_pos = (mx, my)
+                                elif event.button == 3:
+                                    self.open_context_menu((mx, my), "right", idx, eq_item, slot_name=s_key)
+                            break
+                elif self.target and self.target.inventory:
+                    t_items = self.target.inventory.items
+                    for idx, item in enumerate(t_items):
+                        row_y = right_rect.y + 56 + idx * 32
+                        if row_y - 4 <= my <= row_y + 24:
+                            self.active_side = "right"
+                            self.cursor = idx
+                            if event.type == pygame.MOUSEBUTTONDOWN:
+                                if event.button == 1:
+                                    self.drag_item = {"side": "right", "index": idx, "item": item, "slot": None}
+                                    self.drag_start_pos = (mx, my)
+                                elif event.button == 3:
+                                    self.open_context_menu((mx, my), "right", idx, item)
+                            break
+            return None
+
+        # 4. ОДИНОЧНЫЕ ОКНА (Статы, Навыки, Крафт, Диалоги)
+        if self.mode == "stats":
+            box = pygame.Rect(290, 60, 700, 560)
+            if event.type == pygame.MOUSEBUTTONDOWN and not box.collidepoint(mx, my):
+                self.close()
+                return "Окно закрыто"
+            for idx in range(5):
+                y = box.y + 62 + idx * 78
+                if y - 6 <= my <= y + 48 and box.x <= mx <= box.right:
+                    self.cursor = idx
+                    if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                        return self.perform_action()
+                    break
+            return None
+
+        if self.mode == "skills" and self.player.skills:
+            box = pygame.Rect(290, 70, 700, 530)
+            if event.type == pygame.MOUSEBUTTONDOWN and not box.collidepoint(mx, my):
+                self.close()
+                return "Окно закрыто"
+            for idx in range(len(self.player.skills.learned)):
+                y = box.y + 65 + idx * 92
+                if y - 6 <= my <= y + 56 and box.x <= mx <= box.right:
+                    self.cursor = idx
+                    if event.type == pygame.MOUSEBUTTONDOWN and event.button == 3:
+                        return self.perform_action()
+                    break
+            return None
+
+        if self.mode == "professions":
+            box = pygame.Rect(220, 60, 840, 560)
+            if event.type == pygame.MOUSEBUTTONDOWN and not box.collidepoint(mx, my):
+                self.close()
+                return "Окно закрыто"
+            recs = self.get_available_recipes()
+            for idx in range(min(6, len(recs))):
+                y = box.y + 92 + idx * 72
+                if y - 4 <= my <= y + 58 and box.x <= mx <= box.right:
+                    self.cursor = idx
+                    if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                        return self.perform_action()
+                    break
+            return None
+       
+        if self.mode == "dialogue" and self.target:
+            box = pygame.Rect(240, 110, 800, 480)
+            if event.type == pygame.MOUSEBUTTONDOWN and not box.collidepoint(mx, my):
+                self.close()
+                return "Разговор окончен"
+            opts = self.get_dialogue_options()
+            for idx in range(len(opts)):
+                y = box.y + 190 + idx * 46
+                if y - 6 <= my <= y + 32 and box.x + 20 <= mx <= box.right - 20:
+                    self.cursor = idx
+                    if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                        return self.perform_action()
+                    break
+            return None
 
         return None
 
@@ -281,6 +548,11 @@ class UIManager:
                         self.player.inventory.remove_item(item)
                         self.cursor = max(0, min(self.cursor, len(items) - 1))
                         return f"Выпито: {item.name} (+{heal} HP)"
+                    elif "expand_skill_slots" in item.stats_bonus and self.player.skills:
+                        new_lim = self.player.skills.expand_active_slots(item.stats_bonus["expand_skill_slots"])
+                        self.player.inventory.remove_item(item)
+                        self.cursor = max(0, min(self.cursor, len(items) - 1))
+                        return f"Слоты активных навыков расширены до {new_lim}!"
                     elif "mana" in item.stats_bonus:
                         mana = item.stats_bonus["mana"]
                         self.player.stats.mp = min(float(self.player.stats.max_mp), self.player.stats.mp + mana)
@@ -441,7 +713,7 @@ class UIManager:
             is_sel = (self.active_side == side and self.cursor == idx)
             if is_sel:
                 pygame.draw.rect(surface, (45, 55, 75), (rect.x + 10, y - 4, rect.width - 20, 28), border_radius=3)
-            prefix = "▶ " if is_sel else "  "
+            prefix = "> " if is_sel else "  "
             color = (255, 255, 255) if is_sel else (200, 205, 220)
             label = f"{prefix}{item.name}"
             if price_mode == "buy":
@@ -453,11 +725,9 @@ class UIManager:
             txt = self.font_main.render(str(label), True, color)
             surface.blit(txt, (rect.x + 16, y))
 
-
     def draw(self, surface):
         if not self.is_open:
             return
-
         overlay = pygame.Surface((WINDOW_WIDTH, WINDOW_HEIGHT), pygame.SRCALPHA)
         overlay.fill((0, 0, 0, 175))
         surface.blit(overlay, (0, 0))
@@ -478,7 +748,7 @@ class UIManager:
                 is_sel = (self.cursor == idx)
                 if is_sel:
                     pygame.draw.rect(surface, (45, 55, 75), (box_rect.x + 15, y - 6, box_rect.width - 30, 66), border_radius=4)
-                prefix = "▶ " if is_sel else "  "
+                prefix = "> " if is_sel else "  "
                 color = (255, 255, 255) if is_sel else (200, 205, 220)
                 surface.blit(self.font_title.render(f"{prefix}{title}", True, color), (box_rect.x + 25, y))
                 surface.blit(self.font_small.render(f"  {cur_val}", True, (130, 220, 160)), (box_rect.x + 25, y + 26))
@@ -505,7 +775,7 @@ class UIManager:
                     is_sel = (self.cursor == idx)
                     if is_sel:
                         pygame.draw.rect(surface, (45, 55, 75), (box_rect.x + 15, y - 6, box_rect.width - 30, 80), border_radius=4)
-                    prefix = "▶ " if is_sel else "  "
+                    prefix = "> " if is_sel else "  "
                     color = (255, 255, 255) if is_sel else (200, 205, 220)
                     if sk.kind == "active":
                         tag = f"[АКТИВНЫЙ — КЛАВИША {active_idx}]  ({sk.mana_cost} MP, откат {sk.cooldown}с)"
@@ -541,7 +811,7 @@ class UIManager:
                         "completed": ("ЗАВЕРШЕНО", (130, 135, 150))
                     }
                     st_txt, st_col = status_map.get(q.status, ("", (255, 255, 255)))
-                    prefix = "▶ " if is_sel else "  "
+                    prefix = "> " if is_sel else "  "
                     surface.blit(self.font_title.render(f"{prefix}{q.title}  [{st_txt}]", True, st_col), (box_rect.x + 25, y))
                     surface.blit(self.font_small.render(f"   Заказчик: {q.giver_name}  |  {q.desc}", True, (210, 215, 230)), (box_rect.x + 25, y + 28))
                     rew = f"Награда: {q.reward_gold}G, {q.reward_xp} XP" + (f" + {ITEMS_DB[q.reward_item].name}" if q.reward_item else "")
@@ -579,7 +849,7 @@ class UIManager:
                     can_make, reason = p_book.can_craft(rec)
 
                     col = (255, 255, 255) if is_sel else (200, 205, 220)
-                    prefix = "▶ " if is_sel else "  "
+                    prefix = "> " if is_sel else "  "
                     surface.blit(self.font_title.render(f"{prefix}{res_name}  [{prof_name} Ур.{rec.req_level}]", True, col), (box_rect.x + 25, y))
 
                     mats_parts = []
@@ -607,7 +877,7 @@ class UIManager:
                 is_sel = (self.cursor == idx)
                 if is_sel:
                     pygame.draw.rect(surface, (45, 58, 82), (box_rect.x + 20, y - 6, box_rect.width - 40, 38), border_radius=4)
-                prefix = "▶ " if is_sel else "  "
+                prefix = "> " if is_sel else "  "
                 col = (255, 255, 255) if is_sel else (190, 200, 215)
                 surface.blit(self.font_main.render(f"{prefix}{label}", True, col), (box_rect.x + 30, y))
             hint = "W/S: Выбор реплики  |  Enter: Ответить  |  ESC: Уйти"
@@ -617,7 +887,7 @@ class UIManager:
 
         left_rect = pygame.Rect(40, 35, 580, 460)
         right_rect = pygame.Rect(660, 35, 580, 460)
-        info_rect = pygame.Rect(40, 515, 1200, 145)
+        info_rect = pygame.Rect(40, 515, 760, 145)
 
         cap = f"{len(self.player.inventory.items)}/{self.player.inventory.capacity}"
         self.draw_box(surface, left_rect, f"РЮКЗАК ({cap})  |  Золото: {self.player.inventory.gold}G", self.active_side == "left")
@@ -625,13 +895,14 @@ class UIManager:
         self.draw_item_list(surface, left_rect, self.player.inventory.items, "left", p_mode)
 
         if self.mode == "inventory":
+            draw_quick_items_bar(surface, self.player, self.font_small, self.sprites, in_inventory=True)
             self.draw_box(surface, right_rect, "ЭКИПИРОВКА И ХАРАКТЕРИСТИКИ", self.active_side == "right")
             for idx, (slot_key, item) in enumerate(self.player.equipment.slots.items()):
                 y = right_rect.y + 56 + idx * 32
                 is_sel = (self.active_side == "right" and self.cursor == idx)
                 if is_sel:
                     pygame.draw.rect(surface, (45, 55, 75), (right_rect.x + 10, y - 4, right_rect.width - 20, 28), border_radius=3)
-                prefix = "▶ " if is_sel else "  "
+                prefix = "> " if is_sel else "  "
                 color = (255, 255, 255) if is_sel else (200, 205, 220)
                 item_name = item.name if item else "— пусто —"
                 txt = self.font_main.render(f"{prefix}{SLOT_NAMES_RU[slot_key]}: {item_name}", True, color)
@@ -674,3 +945,27 @@ class UIManager:
 
         pygame.draw.rect(surface, (15, 18, 26), (0, WINDOW_HEIGHT - 36, WINDOW_WIDTH, 36))
         surface.blit(self.font_small.render(hint, True, (230, 230, 230)), (40, WINDOW_HEIGHT - 27))
+        # Отрисовка перетаскиваемого предмета (Drag & Drop)
+        if self.drag_item and self.drag_start_pos:
+            mx, my = pygame.mouse.get_pos()
+            sx, sy = self.drag_start_pos
+            if abs(mx - sx) >= 6 or abs(my - sy) >= 6:
+                d_txt = self.font_main.render(self.drag_item["item"].name, True, (255, 255, 255))
+                d_rect = pygame.Rect(mx + 12, my + 8, d_txt.get_width() + 20, 30)
+                pygame.draw.rect(surface, (45, 65, 95), d_rect, border_radius=5)
+                pygame.draw.rect(surface, (240, 195, 75), d_rect, 2, border_radius=5)
+                surface.blit(d_txt, (d_rect.x + 10, d_rect.y + 5))
+
+
+        # Отрисовка контекстного меню (ПКМ)
+        if self.ctx_menu:
+            c_rect = self.ctx_menu["rect"]
+            pygame.draw.rect(surface, (22, 26, 36), c_rect, border_radius=6)
+            pygame.draw.rect(surface, (240, 195, 75), c_rect, 2, border_radius=6)
+            mx, my = pygame.mouse.get_pos()
+            for idx, (_, label) in enumerate(self.ctx_menu["options"]):
+                oy = c_rect.y + 6 + idx * 32
+                opt_r = pygame.Rect(c_rect.x + 4, oy, c_rect.width - 8, 28)
+                if opt_r.collidepoint(mx, my):
+                    pygame.draw.rect(surface, (50, 65, 90), opt_r, border_radius=4)
+                surface.blit(self.font_small.render(label, True, (245, 245, 250)), (opt_r.x + 10, opt_r.y + 6))

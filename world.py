@@ -36,6 +36,12 @@ class WorldMap:
         self.projectiles = []
         self.build_town_square()
 
+    def draw_speeches(self, screen, camera, scale, speech_font):
+        if not speech_font:
+            return
+        for ent in self.entities:
+            ent.draw_speech(screen, camera, scale, speech_font)
+
     def build_town_square(self):
         for r in range(self.rows):
             for c in range(self.cols):
@@ -163,7 +169,7 @@ class WorldMap:
                 ent.combat.swing_rect.x -= camera.offset_x
                 ent.combat.swing_rect.y -= camera.offset_y
 
-            ent.draw(surface, speech_font)
+            ent.draw(surface, None)
 
             ent.rect.topleft = orig_pos
             if ent.combat and ent.combat.swing_rect:

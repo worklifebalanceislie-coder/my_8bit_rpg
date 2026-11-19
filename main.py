@@ -8,34 +8,17 @@ from char_creator import CharacterCreator
 from menus import MainMenu, PauseMenu
 from monster_gen import generate_monster
 from database import DatabaseManager
-
-def draw_hud(surface, player, status_msg, font):
-    mx, my = pygame.mouse.get_pos()
-    cx, cy = mx // SCALE, my // SCALE
-    pygame.draw.line(surface, (255, 220, 90), (cx - 3, cy), (cx + 3, cy), 1)
-    pygame.draw.line(surface, (255, 220, 90), (cx, cy - 3), (cx, cy + 3), 1)
-
-    pygame.draw.rect(surface, (15, 18, 24), (0, NATIVE_HEIGHT - 15, NATIVE_WIDTH, 15))
-    hp_txt = font.render(f"HP:{int(player.stats.hp)}/{player.stats.max_hp}", False, (100, 220, 120))
-    mp_txt = font.render(f"MP:{int(player.stats.mp)}/{player.stats.max_mp}", False, (90, 170, 255))
-    surface.blit(hp_txt, (4, NATIVE_HEIGHT - 13))
-    surface.blit(mp_txt, (56, NATIVE_HEIGHT - 13))
-
-    if player.stats.stat_points > 0:
-        pts_txt = font.render(f"[C]+{player.stats.stat_points}!", False, (255, 215, 60))
-        surface.blit(pts_txt, (104, NATIVE_HEIGHT - 13))
-        surface.blit(font.render(status_msg, False, COLOR_TEXT), (144, NATIVE_HEIGHT - 13))
-    else:
-        surface.blit(font.render(status_msg, False, COLOR_TEXT), (104, NATIVE_HEIGHT - 13))
+from hud import draw_hud
 
 def main():
     pygame.init()
     screen = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT))
+    pygame.scrap.init()
     native_surface = pygame.Surface((NATIVE_WIDTH, NATIVE_HEIGHT))
     pygame.display.set_caption("8-Bit Modular RPG")
     clock = pygame.time.Clock()
-    font = pygame.font.SysFont("monospace", 9)
-    small_font = pygame.font.SysFont("monospace", 8)
+    hud_font = pygame.font.SysFont("consolas", 17, bold=True)
+    speech_font = pygame.font.SysFont("consolas", 15, bold=True)
 
     db = DatabaseManager("rpg.db")
     db.sync_all_catalogs()
@@ -66,7 +49,7 @@ def main():
                         world, player, msg = db.load_world(sprites, slot_id=slot_val)
                         if world and player:
                             camera = Camera(world.width, world.height)
-                            ui = UIManager(player, world.entities, sprites.get("loot"))
+                            ui = UIManager(player, world.entities, sprites.get("loot"), sprites)
                             autosave_timer = 0.0
                             status_msg = msg
                             game_state = "PLAYING"
@@ -169,13 +152,22 @@ def main():
                         camera = Camera(world.width, world.height)
                         ui = UIManager(player, world.entities, sprites.get("loot"))
                     status_msg = msg
-                elif event.key in (pygame.K_1, pygame.K_2) and player.skills:
-                    slot_idx = 0 if event.key == pygame.K_1 else 1
-                    _, msg = player.skills.use_active_slot(slot_idx, world)
+                elif event.key in (pygame.K_1, pygame.K_2, pygame.K_3, pygame.K_4, pygame.K_5, pygame.K_6) and player.skills:
+                    slot_idx = event.key - pygame.K_1
+                    mx, my = pygame.mouse.get_pos()
+                    aim = (mx // SCALE + camera.offset_x, my // SCALE + camera.offset_y)
+                    _, msg = player.skills.use_active_slot(slot_idx, world, aim_pos=aim)
+                    if msg:
+                        status_msg = msg
+                elif event.key in (pygame.K_q, pygame.K_f, pygame.K_z, pygame.K_x):
+                    q_map = {pygame.K_q: 0, pygame.K_f: 1, pygame.K_z: 2, pygame.K_x: 3}
+                    msg = player.use_quick_item(q_map[event.key])
                     if msg:
                         status_msg = msg
                 elif event.key == pygame.K_SPACE and player.combat:
-                    player.combat.attack(world)
+                    mx, my = pygame.mouse.get_pos()
+                    aim = (mx // SCALE + camera.offset_x, my // SCALE + camera.offset_y)
+                    player.combat.attack(world, aim_pos=aim)
                 elif event.key == pygame.K_m:
                     new_mob = generate_monster(460, 180, sprites, db=db)
                     world.entities.append(new_mob)
@@ -217,14 +209,19 @@ def main():
                     player.respawn()
                     status_msg = "Герой возрожден!"
 
+        native_surface.fill((15, 18, 24))
         camera.follow(player)
-        speech_font = small_font if db.settings.get("show_speech", True) else None
-        world.draw(native_surface, sprites, camera, speech_font)
-
-        if not ui.is_open:
-            draw_hud(native_surface, player, status_msg, font)
+        if not ui.is_open and player.stats.hp > 0:
+            mx, my = pygame.mouse.get_pos()
+            world_mx = mx // SCALE + camera.offset_x
+            player.facing_left = (world_mx < player.rect.centerx)
+        world.draw(native_surface, sprites, camera, None)
 
         screen.blit(pygame.transform.scale(native_surface, (WINDOW_WIDTH, WINDOW_HEIGHT)), (0, 0))
+        if db.settings.get("show_speech", True):
+            world.draw_speeches(screen, camera, SCALE, speech_font)
+        if not ui.is_open:
+            draw_hud(screen, player, status_msg, hud_font, sprites)
         ui.draw(screen)
         pygame.display.flip()
 

@@ -2,14 +2,15 @@ import math
 from components.combat import Projectile
 
 class Skill:
-    def __init__(self, skill_id, name, kind, mana_cost=0, cooldown=3.0, desc=""):
+    def __init__(self, skill_id, name, kind, mana_cost=0, cooldown=3.0, desc="", sprite_key=None):
         self.id = skill_id
         self.name = name
         self.kind = kind
         self.mana_cost = mana_cost
         self.cooldown = cooldown
-        self.timer = 0.0
         self.desc = desc
+        self.sprite_key = sprite_key
+        self.timer = 0.0
 
 SKILLS_DB = {
     "whirlwind": Skill("whirlwind", "Вихрь клинка", "active", mana_cost=12, cooldown=3.5, desc="Круговой удар. Урон: Сила x2"),
@@ -33,33 +34,44 @@ def create_skill(skill_id):
 
 
 class SkillBook:
-    def __init__(self, owner, max_slots=4):
+    def __init__(self, owner, max_slots=6, max_active_slots=2):
         self.owner = owner
-        self.max_slots = max_slots
+        self.max_slots = max_slots               # Общая вместимость книги (активные + пассивные)
+        self.max_active_slots = max_active_slots # Сколько активных навыков можно использовать на панели (1, 2, 3...)
         self.learned = []
+        self.cooldowns = {}
+
+    def get_active_skills(self):
+        return [s for s in self.learned if s.kind == "active"][:self.max_active_slots]
+
+    def expand_active_slots(self, amount=1):
+        self.max_active_slots = min(6, self.max_active_slots + amount)
+        self.max_slots = max(self.max_slots, self.max_active_slots + 4)
+        return self.max_active_slots
+
 
     def has_skill(self, skill_id):
         return any(s.id == skill_id for s in self.learned)
 
     def learn_skill(self, skill_id):
+        if skill_id not in SKILLS_DB:
+            return False, "Неизвестный навык"
         if self.has_skill(skill_id):
-            return False, "Этот навык уже изучен!"
+            return False, f"Навык '{SKILLS_DB[skill_id].name}' уже изучен!"
+        sk = SKILLS_DB[skill_id]
+        if sk.kind == "active" and len(self.get_active_skills()) >= self.max_active_slots:
+            return False, f"Максимум активных навыков ({self.max_active_slots})! Забудьте старый [K] или расширьте слоты."
         if len(self.learned) >= self.max_slots:
-            return False, f"Память заполнена ({self.max_slots}/{self.max_slots})! Забудьте навык в меню [K]."
-        sk = create_skill(skill_id)
-        if sk:
-            self.learned.append(sk)
-            return True, f"Изучен навык: {sk.name}!"
-        return False, "Неизвестный навык"
+            return False, f"Книга навыков переполнена (макс. {self.max_slots})!"
+        self.learned.append(sk)
+        return True, f"Изучен навык: {sk.name}!"
+
 
     def forget_skill(self, index):
         if 0 <= index < len(self.learned):
             removed = self.learned.pop(index)
             return True, f"Забыт навык: {removed.name}"
         return False, ""
-
-    def get_active_skills(self):
-        return [s for s in self.learned if s.kind == "active"]
 
     def update(self, dt):
         for sk in self.learned:

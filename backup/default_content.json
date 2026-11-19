@@ -1,0 +1,960 @@
+{
+  "sprites_catalog": [
+    {
+      "sprite_key": "player",
+      "art_matrix": "[\".....KKKKKK.....\", \"....KHHHHHHK....\", \"....KHHHHHHK....\", \"....KSSSSSSK....\", \"....KSKSSKSK....\", \"....KSSSSSSK....\", \".....KKKKKK.....\", \"...KKGGGGGGKK...\", \"..KGGGGGGGGGGK..\", \"..KGGgGGGGgGGK..\", \"..KSSKGGGGKSSK..\", \"..KK.KYYYYK.KK..\", \".....KggggK.....\", \".....KggggK.....\", \".....KK..KK.....\", \"....KKK..KKK....\"]"
+    },
+    {
+      "sprite_key": "npc",
+      "art_matrix": "[\"....KKKKKKKK....\", \"...KYYYYYYYYK...\", \"..KYYYYYYYYYYK..\", \"....KSSSSSSK....\", \"....KSKSSKSK....\", \"....KHHHHHHK....\", \".....KHHHHK.....\", \"...KKYYYYYYKK...\", \"..KYYyYYYYyYYK..\", \"..KYYyYYYYyYYK..\", \"..KSSKYYYYKSSK..\", \"..KK.KbbbbK.KK..\", \".....KyyyyK.....\", \".....KyyyyK.....\", \".....KK..KK.....\", \"....KKK..KKK....\"]"
+    },
+    {
+      "sprite_key": "guard",
+      "art_matrix": "[\"....KKKKKKKK....\", \"...KMMMMMMMMK...\", \"..KMMmMMMMmMMK..\", \"...KMSSSSSSMK...\", \"....KSKSSKSK....\", \"....KSSSSSSK....\", \".....KKKKKK.....\", \"...KKUUUUUUKK...\", \"..KUUUUUUUUUUK..\", \"..KUUYUUUUYUUK..\", \"..KMMKUUUUKMMK..\", \"..KK.KMMMMK.KK..\", \".....KmmmmK.....\", \".....KmmmmK.....\", \".....KK..KK.....\", \"....KKK..KKK....\"]"
+    },
+    {
+      "sprite_key": "adventurer",
+      "art_matrix": "[\".....KKKKKK.....\", \"....KYYYYYYK....\", \"....KYYYYYYK....\", \"....KSSSSSSK....\", \"....KSKSSKSK....\", \"....KSSSSSSK....\", \".....KKKKKK.....\", \"...KKCCCCCCKK...\", \"..KCCCCCCCCCCK..\", \"..KCCcCCCCcCCK..\", \"..KSSKCCCCKSSK..\", \"..KK.KbbbbK.KK..\", \".....KccccK.....\", \".....KccccK.....\", \".....KK..KK.....\", \"....KKK..KKK....\"]"
+    },
+    {
+      "sprite_key": "goblin",
+      "art_matrix": "[\"................\", \"....KKKKKKKK....\", \"..KKKEEEEEEKKK..\", \".KEEKREEEERKKEK.\", \"..KKKEEEEEEKKK..\", \"....KEKKKKKK....\", \".....KKKKKK.....\", \"...KKbbbbbbKK...\", \"..KbbbbbbbbbbK..\", \"..KEEKbbbbKEEK..\", \"..KK.KYYYYK.KK..\", \".....KeeeeK.....\", \".....KeeeeK.....\", \".....KK..KK.....\", \"....KKK..KKK....\", \"................\"]"
+    },
+    {
+      "sprite_key": "chest",
+      "art_matrix": "[\"................\", \"................\", \"..KKKKKKKKKKKK..\", \".KBBBBBBBBBBBBK.\", \".KBBBBYYYYBBBBK.\", \".KBBBBYKKYBBBBK.\", \".KKKKKKKKKKKKKK.\", \".KbbbbYKKYbbbbK.\", \".KbbbbYYYYbbbbK.\", \".KbbbbbbbbbbbbK.\", \".KbbbbbbbbbbbbK.\", \".KbbbbbbbbbbbbK.\", \"..KKKKKKKKKKKK..\", \"................\", \"................\", \"................\"]"
+    },
+    {
+      "sprite_key": "loot",
+      "art_matrix": "[\"................\", \"................\", \"......KKKK......\", \".....KBBBBK.....\", \"......KYYK......\", \"....KKBBBBKK....\", \"...KBBBBBBBBK...\", \"..KBBBBbbBBBBK..\", \"..KBBBbbbbBBBK..\", \"..KBBBBbbBBBBK..\", \"...KbbbbbbbbK...\", \"....KKKKKKKK....\", \"................\", \"................\", \"................\", \"................\"]"
+    },
+    {
+      "sprite_key": "floor",
+      "art_matrix": "[\"FFFFFFFFFFFFFFFF\", \"FffFFFFFFFFFFFFF\", \"FffFFFFFFFFFFFFF\", \"FFFFFFFFFFFFFFFF\", \"FFFFFFFFFFFFFFFF\", \"FFFFFFFFFFffFFFF\", \"FFFFFFFFFFffFFFF\", \"FFFFFFFFFFFFFFFF\", \"FFFFFFFFFFFFFFFF\", \"FFFFffFFFFFFFFFF\", \"FFFFffFFFFFFFFFF\", \"FFFFFFFFFFFFFFFF\", \"FFFFFFFFFFFFFFFF\", \"FFFFFFFFFFFFffFF\", \"FFFFFFFFFFFFffFF\", \"FFFFFFFFFFFFFFFF\"]"
+    },
+    {
+      "sprite_key": "wall",
+      "art_matrix": "[\"LLLLLLLLLLLLLLLw\", \"LWWWWWWwWWWWWWWw\", \"LWWWWWWwWWWWWWWw\", \"wwwwwwwwwwwwwwww\", \"LLLwLLLLLLLLLLLw\", \"WWWwWWWWWWWWWWWw\", \"WWWwWWWWWWWWWWWw\", \"wwwwwwwwwwwwwwww\", \"LLLLLLLLLLwLLLLw\", \"WWWWWWWWWWwWWWWw\", \"WWWWWWWWWWwWWWWw\", \"wwwwwwwwwwwwwwww\", \"LLLLwLLLLLLLLLLw\", \"WWWWwWWWWWWWWWWw\", \"WWWWwWWWWWWWWWWw\", \"wwwwwwwwwwwwwwww\"]"
+    },
+    {
+      "sprite_key": "grass",
+      "art_matrix": "[\"VVVVVVVVVVVVVVVV\", \"VVZVVVVVVVVVVVVV\", \"VVVVVVVVVVvVVVVV\", \"VVVVVVVVVVVVVVVV\", \"VVVVVVVVVVVVZVVV\", \"VVvVVVVVVVVVVVVV\", \"VVVVVVVVVVVVVVVV\", \"VVVVVVZVVVVVVVVV\", \"VVVVVVVVVVVVVVvV\", \"VVVVVVVVVVVVVVVV\", \"VVZVVVVVVVVVVVVV\", \"VVVVVVVVVvVVVVVV\", \"VVVVVVVVVVVVVVVV\", \"VVVVVVVVVVVVZVVV\", \"VVVVvVVVVVVVVVVV\", \"VVVVVVVVVVVVVVVV\"]"
+    },
+    {
+      "sprite_key": "dirt",
+      "art_matrix": "[\"DDDDDDDDDDDDDDDD\", \"DDdDDDDDDDDDDDDD\", \"DDDDDDDDDDDdDDDD\", \"DDDDDDDDDDDDDDDD\", \"DDDDDDdDDDDDDDDD\", \"DDDDDDDDDDDDDDDD\", \"DDDDDDDDDDDDdDDD\", \"DDdDDDDDDDDDDDDD\", \"DDDDDDDDDDDDDDDD\", \"DDDDDDDDdDDDDDDD\", \"DDDDDDDDDDDDDDDD\", \"DDDDdDDDDDDDDdDD\", \"DDDDDDDDDDDDDDDD\", \"DDDDDDDDDDdDDDDD\", \"DDdDDDDDDDDDDDDD\", \"DDDDDDDDDDDDDDDD\"]"
+    },
+    {
+      "sprite_key": "sand",
+      "art_matrix": "[\"PPPPPPPPPPPPPPPP\", \"PPpPPPPPPPPPPPPP\", \"PPPPPPPPPPpPPPPP\", \"PPPPPPPPPPPPPPPP\", \"PPPPpPPPPPPPPPPP\", \"PPPPPPPPPPPPpPPP\", \"PPPPPPPPPPPPPPPP\", \"PPPPPPPPpPPPPPPP\", \"PPpPPPPPPPPPPPPP\", \"PPPPPPPPPPPPPPPP\", \"PPPPPPPPPPPPpPPP\", \"PPPPPPpPPPPPPPPP\", \"PPPPPPPPPPPPPPPP\", \"PPpPPPPPPPPPPPPP\", \"PPPPPPPPpPPPPPPP\", \"PPPPPPPPPPPPPPPP\"]"
+    },
+    {
+      "sprite_key": "cobble",
+      "art_matrix": "[\"qqqqqqqqqqqqqqqq\", \"qQQQQQqQQQQQQQqQ\", \"qQQQQQqQQQQQQQqQ\", \"qQQQQQqQQQQQQQqQ\", \"qqqqqqqqqqqqqqqq\", \"QQQqQQQQQQQqQQQQ\", \"QQQqQQQQQQQqQQQQ\", \"QQQqQQQQQQQqQQQQ\", \"qqqqqqqqqqqqqqqq\", \"qQQQQQqQQQQQQQqQ\", \"qQQQQQqQQQQQQQqQ\", \"qQQQQQqQQQQQQQqQ\", \"qqqqqqqqqqqqqqqq\", \"QQQqQQQQQQQqQQQQ\", \"QQQqQQQQQQQqQQQQ\", \"qqqqqqqqqqqqqqqq\"]"
+    },
+    {
+      "sprite_key": "water",
+      "art_matrix": "[\"AAAAAAAAAAAAAAAA\", \"AAaaAAAAAAAAAAAA\", \"AAAAAAAAAAAAAAAA\", \"AAAAAAAAAAaaaAAA\", \"AAAAAAAAAAAAAAAA\", \"AAAAaaaAAAAAAAAA\", \"AAAAAAAAAAAAAAAA\", \"AAAAAAAAAAAAAAAA\", \"AAAAAAAAAAAAaaAA\", \"AAAAAAAAAAAAAAAA\", \"AAaaaAAAAAAAAAAA\", \"AAAAAAAAAAAAAAAA\", \"AAAAAAAAaaAAAAAA\", \"AAAAAAAAAAAAAAAA\", \"AAAAaaAAAAAAAAAA\", \"AAAAAAAAAAAAAAAA\"]"
+    },
+    {
+      "sprite_key": "equip_rusty_sword",
+      "art_matrix": "[\"................\", \"................\", \"................\", \"..............K.\", \".............KOK\", \"............KOoK\", \"...........KOoK.\", \"..........KOoK..\", \".........KKYK...\", \"........KYYK....\", \"........KHK.....\", \"................\", \"................\", \"................\", \"................\", \"................\"]"
+    },
+    {
+      "sprite_key": "equip_iron_sword",
+      "art_matrix": "[\"................\", \"................\", \"...............K\", \"..............KM\", \".............KMM\", \"............KMMm\", \"...........KMMmK\", \"..........KMMmK.\", \".........KKYK...\", \"........KYYK....\", \"........KHK.....\", \"................\", \"................\", \"................\", \"................\", \"................\"]"
+    },
+    {
+      "sprite_key": "equip_hunting_bow",
+      "art_matrix": "[\"................\", \"................\", \"................\", \"...........KK...\", \"..........KBBK..\", \".........KB..MK.\", \".........KB..MK.\", \".........KB..MK.\", \".........KB..MK.\", \"..........KBBK..\", \"...........KK...\", \"................\", \"................\", \"................\", \"................\", \"................\"]"
+    },
+    {
+      "sprite_key": "equip_fire_staff",
+      "art_matrix": "[\"................\", \"............KK..\", \"...........KRRK.\", \"...........KYYK.\", \"............KK..\", \"............KB..\", \"...........KB...\", \"..........KB....\", \".........KB.....\", \"........KB......\", \".......KB.......\", \"................\", \"................\", \"................\", \"................\", \"................\"]"
+    },
+    {
+      "sprite_key": "equip_leather_armor",
+      "art_matrix": "[\"................\", \"................\", \"................\", \"................\", \"................\", \"................\", \"................\", \"....KKKKKKKK....\", \"....KBBBBBBK....\", \"....KBbBBbBK....\", \".....KBBBBK.....\", \".....KYYYYK.....\", \"................\", \"................\", \"................\", \"................\"]"
+    },
+    {
+      "sprite_key": "equip_chainmail",
+      "art_matrix": "[\"................\", \"................\", \"................\", \"................\", \"................\", \"................\", \"................\", \"....KKKKKKKK....\", \"....KMmMmMmK....\", \"....KmMmMmMK....\", \".....KMmMmK.....\", \".....KYYYYK.....\", \"................\", \"................\", \"................\", \"................\"]"
+    }
+  ],
+  "items_catalog": [
+    {
+      "id": "potion",
+      "name": "Зелье лечения",
+      "item_type": "consumable",
+      "value": 15,
+      "stats_bonus": "{\"heal\": 25}",
+      "description": "Восстанавливает 25 здоровья.",
+      "combat_style": "melee",
+      "skill_id": null,
+      "sprite_key": null
+    },
+    {
+      "id": "mana_potion",
+      "name": "Зелье маны",
+      "item_type": "consumable",
+      "value": 15,
+      "stats_bonus": "{\"mana\": 35}",
+      "description": "Восстанавливает 35 маны.",
+      "combat_style": "melee",
+      "skill_id": null,
+      "sprite_key": null
+    },
+    {
+      "id": "rusty_sword",
+      "name": "Ржавый меч",
+      "item_type": "weapon",
+      "value": 30,
+      "stats_bonus": "{\"atk\": 3}",
+      "description": "Старый клинок со следами ржавчины.",
+      "combat_style": "melee",
+      "skill_id": null,
+      "sprite_key": "equip_rusty_sword"
+    },
+    {
+      "id": "iron_sword",
+      "name": "Железный меч",
+      "item_type": "weapon",
+      "value": 75,
+      "stats_bonus": "{\"atk\": 7}",
+      "description": "Надежный клинок городской стражи.",
+      "combat_style": "melee",
+      "skill_id": null,
+      "sprite_key": "equip_iron_sword"
+    },
+    {
+      "id": "hunting_bow",
+      "name": "Охотничий лук",
+      "item_type": "weapon",
+      "value": 65,
+      "stats_bonus": "{\"atk\": 5}",
+      "description": "Стреляет быстрыми стрелами на дистанции.",
+      "combat_style": "bow",
+      "skill_id": null,
+      "sprite_key": "equip_hunting_bow"
+    },
+    {
+      "id": "fire_staff",
+      "name": "Посох огня",
+      "item_type": "weapon",
+      "value": 95,
+      "stats_bonus": "{\"atk\": 8}",
+      "description": "Выпускает огненные шары (расход: 10 MP).",
+      "combat_style": "staff",
+      "skill_id": null,
+      "sprite_key": "equip_fire_staff"
+    },
+    {
+      "id": "leather_armor",
+      "name": "Кожаная броня",
+      "item_type": "armor",
+      "value": 25,
+      "stats_bonus": "{\"def\": 2}",
+      "description": "Легкая куртка из дубленой кожи.",
+      "combat_style": "melee",
+      "skill_id": null,
+      "sprite_key": "equip_leather_armor"
+    },
+    {
+      "id": "chainmail",
+      "name": "Кольчуга",
+      "item_type": "armor",
+      "value": 70,
+      "stats_bonus": "{\"def\": 5}",
+      "description": "Прочная рубаха из стальных колец.",
+      "combat_style": "melee",
+      "skill_id": null,
+      "sprite_key": "equip_chainmail"
+    },
+    {
+      "id": "leather_pants",
+      "name": "Кожаные штаны",
+      "item_type": "pants",
+      "value": 20,
+      "stats_bonus": "{\"def\": 1}",
+      "description": "Удобные походные штаны.",
+      "combat_style": "melee",
+      "skill_id": null,
+      "sprite_key": null
+    },
+    {
+      "id": "iron_greaves",
+      "name": "Латные поножи",
+      "item_type": "pants",
+      "value": 55,
+      "stats_bonus": "{\"def\": 3}",
+      "description": "Тяжелая защита для ног.",
+      "combat_style": "melee",
+      "skill_id": null,
+      "sprite_key": null
+    },
+    {
+      "id": "travel_boots",
+      "name": "Сапоги странника",
+      "item_type": "boots",
+      "value": 25,
+      "stats_bonus": "{\"def\": 1}",
+      "description": "Прочные кожаные сапоги.",
+      "combat_style": "melee",
+      "skill_id": null,
+      "sprite_key": null
+    },
+    {
+      "id": "power_ring",
+      "name": "Кольцо силы",
+      "item_type": "ring",
+      "value": 60,
+      "stats_bonus": "{\"atk\": 2}",
+      "description": "Медное кольцо с руной удара.",
+      "combat_style": "melee",
+      "skill_id": null,
+      "sprite_key": null
+    },
+    {
+      "id": "mage_ring",
+      "name": "Кольцо мага",
+      "item_type": "ring",
+      "value": 65,
+      "stats_bonus": "{\"mp\": 25}",
+      "description": "Сапфировое кольцо, расширяющее запас маны.",
+      "combat_style": "melee",
+      "skill_id": null,
+      "sprite_key": null
+    },
+    {
+      "id": "guard_amulet",
+      "name": "Амулет стража",
+      "item_type": "amulet",
+      "value": 65,
+      "stats_bonus": "{\"def\": 2, \"hp\": 15}",
+      "description": "Оберег, усиливающий владельца.",
+      "combat_style": "melee",
+      "skill_id": null,
+      "sprite_key": null
+    },
+    {
+      "id": "small_bag",
+      "name": "Походный рюкзак",
+      "item_type": "backpack",
+      "value": 35,
+      "stats_bonus": "{\"capacity\": 6}",
+      "description": "Увеличивает место в инвентаре на 6 слотов.",
+      "combat_style": "melee",
+      "skill_id": null,
+      "sprite_key": null
+    },
+    {
+      "id": "big_bag",
+      "name": "Большой баул",
+      "item_type": "backpack",
+      "value": 85,
+      "stats_bonus": "{\"capacity\": 12}",
+      "description": "Вместительный мешок искателя приключений.",
+      "combat_style": "melee",
+      "skill_id": null,
+      "sprite_key": null
+    },
+    {
+      "id": "gem",
+      "name": "Рубин",
+      "item_type": "misc",
+      "value": 50,
+      "stats_bonus": "{}",
+      "description": "Драгоценный камень для продажи.",
+      "combat_style": "melee",
+      "skill_id": null,
+      "sprite_key": null
+    },
+    {
+      "id": "book_whirlwind",
+      "name": "Книга: Вихрь клинка",
+      "item_type": "book",
+      "value": 55,
+      "stats_bonus": "{}",
+      "description": "Активный: круговой удар (Урон: Сила x2, 12 MP).",
+      "combat_style": "melee",
+      "skill_id": "whirlwind",
+      "sprite_key": null
+    },
+    {
+      "id": "book_volley",
+      "name": "Книга: Залп стрел",
+      "item_type": "book",
+      "value": 55,
+      "stats_bonus": "{}",
+      "description": "Активный: 3 стрелы веером (Урон: Ловк x1.5, 14 MP).",
+      "combat_style": "melee",
+      "skill_id": "volley",
+      "sprite_key": null
+    },
+    {
+      "id": "book_ice",
+      "name": "Книга: Ледяная стрела",
+      "item_type": "book",
+      "value": 60,
+      "stats_bonus": "{}",
+      "description": "Активный: лед (Урон: Инт x2.2 + замедление, 15 MP).",
+      "combat_style": "melee",
+      "skill_id": "ice_bolt",
+      "sprite_key": null
+    },
+    {
+      "id": "book_heal",
+      "name": "Книга: Исцеление",
+      "item_type": "book",
+      "value": 50,
+      "stats_bonus": "{}",
+      "description": "Активный: лечение (15 + Инт x3 HP, 18 MP).",
+      "combat_style": "melee",
+      "skill_id": "heal_spell",
+      "sprite_key": null
+    },
+    {
+      "id": "book_blade",
+      "name": "Книга: Мастер клинка",
+      "item_type": "book",
+      "value": 65,
+      "stats_bonus": "{}",
+      "description": "Пассивный: +50% от Силы к урону в ближнем бою.",
+      "combat_style": "melee",
+      "skill_id": "passive_blade",
+      "sprite_key": null
+    },
+    {
+      "id": "book_skin",
+      "name": "Книга: Каменная кожа",
+      "item_type": "book",
+      "value": 65,
+      "stats_bonus": "{}",
+      "description": "Пассивный: +50% от Стойкости к защите.",
+      "combat_style": "melee",
+      "skill_id": "passive_skin",
+      "sprite_key": null
+    },
+    {
+      "id": "book_mana",
+      "name": "Книга: Поток маны",
+      "item_type": "book",
+      "value": 60,
+      "stats_bonus": "{}",
+      "description": "Пассивный: ускоряет регенерацию маны от Интеллекта.",
+      "combat_style": "melee",
+      "skill_id": "passive_mana",
+      "sprite_key": null
+    },
+    {
+      "id": "essence_whirlwind",
+      "name": "Эссенция: Вихрь клинка",
+      "item_type": "book",
+      "value": 45,
+      "stats_bonus": "{}",
+      "description": "Сгусток боевой энергии. Изучает навык 'Вихрь клинка'.",
+      "combat_style": "melee",
+      "skill_id": "whirlwind",
+      "sprite_key": null
+    },
+    {
+      "id": "essence_volley",
+      "name": "Эссенция: Залп стрел",
+      "item_type": "book",
+      "value": 45,
+      "stats_bonus": "{}",
+      "description": "Сгусток энергии ветра. Изучает навык 'Залп стрел'.",
+      "combat_style": "melee",
+      "skill_id": "volley",
+      "sprite_key": null
+    },
+    {
+      "id": "essence_ice",
+      "name": "Эссенция: Ледяная стрела",
+      "item_type": "book",
+      "value": 50,
+      "stats_bonus": "{}",
+      "description": "Морозный кристалл души. Изучает навык 'Ледяная стрела'.",
+      "combat_style": "melee",
+      "skill_id": "ice_bolt",
+      "sprite_key": null
+    },
+    {
+      "id": "essence_heal",
+      "name": "Эссенция: Исцеление",
+      "item_type": "book",
+      "value": 45,
+      "stats_bonus": "{}",
+      "description": "Светлая сфера жизни. Изучает навык 'Свет исцеления'.",
+      "combat_style": "melee",
+      "skill_id": "heal_spell",
+      "sprite_key": null
+    },
+    {
+      "id": "essence_blade",
+      "name": "Эссенция: Мастер клинка",
+      "item_type": "book",
+      "value": 55,
+      "stats_bonus": "{}",
+      "description": "Осколок мастерства. Изучает пассивку 'Мастер клинка'.",
+      "combat_style": "melee",
+      "skill_id": "passive_blade",
+      "sprite_key": null
+    },
+    {
+      "id": "essence_skin",
+      "name": "Эссенция: Каменная кожа",
+      "item_type": "book",
+      "value": 55,
+      "stats_bonus": "{}",
+      "description": "Каменное ядро. Изучает пассивку 'Каменная кожа'.",
+      "combat_style": "melee",
+      "skill_id": "passive_skin",
+      "sprite_key": null
+    },
+    {
+      "id": "essence_mana",
+      "name": "Эссенция: Поток маны",
+      "item_type": "book",
+      "value": 50,
+      "stats_bonus": "{}",
+      "description": "Магический сгусток. Изучает пассивку 'Поток маны'.",
+      "combat_style": "melee",
+      "skill_id": "passive_mana",
+      "sprite_key": null
+    },
+    {
+      "id": "speed_potion",
+      "name": "Зелье скорости",
+      "item_type": "consumable",
+      "value": 25,
+      "stats_bonus": "{\"effect\": \"haste\"}",
+      "description": "Ускоряет бег на 8 секунд.",
+      "combat_style": "melee",
+      "skill_id": null,
+      "sprite_key": null
+    },
+    {
+      "id": "shield_potion",
+      "name": "Зелье каменной кожи",
+      "item_type": "consumable",
+      "value": 30,
+      "stats_bonus": "{\"effect\": \"shield\"}",
+      "description": "Дает +4 к Защите на 12 секунд.",
+      "combat_style": "melee",
+      "skill_id": null,
+      "sprite_key": null
+    },
+    {
+      "id": "antidote",
+      "name": "Противоядие",
+      "item_type": "consumable",
+      "value": 15,
+      "stats_bonus": "{\"cure\": true}",
+      "description": "Снимает отравление и горение.",
+      "combat_style": "melee",
+      "skill_id": null,
+      "sprite_key": null
+    },
+        {
+      "id": "iron_ore",
+      "name": "Железная руда",
+      "item_type": "misc",
+      "value": 12,
+      "stats_bonus": "{}",
+      "description": "Слиток руды для кузнечного дела.",
+      "combat_style": "melee",
+      "skill_id": null,
+      "sprite_key": null
+    },
+    {
+      "id": "wood_log",
+      "name": "Брус дерева",
+      "item_type": "misc",
+      "value": 10,
+      "stats_bonus": "{}",
+      "description": "Крепкая древесина для плотника.",
+      "combat_style": "melee",
+      "skill_id": null,
+      "sprite_key": null
+    },
+    {
+      "id": "herb_leaf",
+      "name": "Целебная трава",
+      "item_type": "misc",
+      "value": 8,
+      "stats_bonus": "{}",
+      "description": "Ароматный лист для алхимика.",
+      "combat_style": "melee",
+      "skill_id": null,
+      "sprite_key": null
+    },
+    {
+      "id": "leather_piece",
+      "name": "Кусок кожи",
+      "item_type": "misc",
+      "value": 10,
+      "stats_bonus": "{}",
+      "description": "Выделанная шкура для брони и сумок.",
+      "combat_style": "melee",
+      "skill_id": null,
+      "sprite_key": null
+    }
+  ],
+  "skills_catalog": [
+    {
+      "id": "whirlwind",
+      "name": "Вихрь клинка",
+      "kind": "active",
+      "mana_cost": 12,
+      "cooldown": 3.5,
+      "desc": "Круговой удар. Урон: Сила x2"
+    },
+    {
+      "id": "volley",
+      "name": "Залп стрел",
+      "kind": "active",
+      "mana_cost": 14,
+      "cooldown": 3.0,
+      "desc": "Веер из 3 стрел. Урон: Ловкость x1.5"
+    },
+    {
+      "id": "ice_bolt",
+      "name": "Ледяная стрела",
+      "kind": "active",
+      "mana_cost": 15,
+      "cooldown": 2.5,
+      "desc": "Урон: Инт x2.2 + замедление врага"
+    },
+    {
+      "id": "heal_spell",
+      "name": "Свет исцеления",
+      "kind": "active",
+      "mana_cost": 18,
+      "cooldown": 5.0,
+      "desc": "Лечит: 15 + Интеллект x3 HP"
+    },
+    {
+      "id": "passive_blade",
+      "name": "Мастер клинка",
+      "kind": "passive",
+      "mana_cost": 0,
+      "cooldown": 3.0,
+      "desc": "Пассивно: +50% от Силы к ближ. урону"
+    },
+    {
+      "id": "passive_skin",
+      "name": "Каменная кожа",
+      "kind": "passive",
+      "mana_cost": 0,
+      "cooldown": 3.0,
+      "desc": "Пассивно: +50% от Стойкости к броне"
+    },
+    {
+      "id": "passive_mana",
+      "name": "Поток маны",
+      "kind": "passive",
+      "mana_cost": 0,
+      "cooldown": 3.0,
+      "desc": "Пассивно: +0.5 x Инт к регену MP/с"
+    },
+    {
+      "id": "race_human",
+      "name": "Воля человека",
+      "kind": "passive",
+      "mana_cost": 0,
+      "cooldown": 3.0,
+      "desc": "Раса: +20% к получаемому опыту и +1 к Защите"
+    },
+    {
+      "id": "race_elf",
+      "name": "Шаг ветра",
+      "kind": "active",
+      "mana_cost": 8,
+      "cooldown": 2.5,
+      "desc": "Раса: мгновенный рывок в сторону движения"
+    },
+    {
+      "id": "race_goblin",
+      "name": "Гоблинская жадность",
+      "kind": "passive",
+      "mana_cost": 0,
+      "cooldown": 3.0,
+      "desc": "Раса: +50% золота при сборе лута и из сундуков"
+    },
+    {
+      "id": "race_skeleton",
+      "name": "Похищение жизни",
+      "kind": "active",
+      "mana_cost": 12,
+      "cooldown": 3.5,
+      "desc": "Раса: урон Инт x1.8 и лечение на 50% урона"
+    }
+  ],
+  "effects_catalog": [
+    {
+      "id": "burn",
+      "name": "Горение",
+      "color": "[245, 110, 40]",
+      "tick_interval": 1.0,
+      "speed_mult": 1.0,
+      "def_bonus": 0
+    },
+    {
+      "id": "poison",
+      "name": "Отравление",
+      "color": "[90, 210, 75]",
+      "tick_interval": 1.0,
+      "speed_mult": 1.0,
+      "def_bonus": 0
+    },
+    {
+      "id": "slow",
+      "name": "Замедление",
+      "color": "[100, 210, 255]",
+      "tick_interval": 0.0,
+      "speed_mult": 0.5,
+      "def_bonus": 0
+    },
+    {
+      "id": "haste",
+      "name": "Ускорение",
+      "color": "[255, 225, 80]",
+      "tick_interval": 0.0,
+      "speed_mult": 1.45,
+      "def_bonus": 0
+    },
+    {
+      "id": "shield",
+      "name": "Маг. щит",
+      "color": "[140, 160, 255]",
+      "tick_interval": 0.0,
+      "speed_mult": 1.0,
+      "def_bonus": 4
+    }
+  ],
+  "races_catalog": [
+    {
+      "id": "human",
+      "name": "Человек",
+      "faction": "player",
+      "speed": 80,
+      "bonuses": "{\"str\": 1, \"agi\": 1, \"int\": 1, \"vit\": 1, \"end\": 1}",
+      "gold_bonus": 15,
+      "racial_skill": "race_human",
+      "desc": "Сбалансированная раса. Города дружелюбны, гоблины — враги.",
+      "relations": "Имперский город: Союзник | Вольный город: Друг | Гоблины: Враги",
+      "sprite_key": "player"
+    },
+    {
+      "id": "elf",
+      "name": "Лесной Эльф",
+      "faction": "player",
+      "speed": 88,
+      "bonuses": "{\"str\": 0, \"agi\": 2, \"int\": 2, \"vit\": -1, \"end\": 0}",
+      "gold_bonus": 10,
+      "racial_skill": "race_elf",
+      "desc": "Быстрый и ловкий народ. Владеет рывком 'Шаг ветра'.",
+      "relations": "Имперский город: Друг | Вольный город: Друг | Гоблины: Враги",
+      "sprite_key": "adventurer"
+    },
+    {
+      "id": "goblin",
+      "name": "Гоблин",
+      "faction": "monster",
+      "speed": 90,
+      "bonuses": "{\"str\": 1, \"agi\": 3, \"int\": -1, \"vit\": 0, \"end\": 0}",
+      "gold_bonus": 0,
+      "racial_skill": "race_goblin",
+      "desc": "Хитрый дикарь. Гоблины считают вас своим! Империя — враг.",
+      "relations": "Гоблины: СВОИ | Вольный город: Нейтрал | Имперский город: ВРАГИ!",
+      "sprite_key": "goblin"
+    },
+    {
+      "id": "skeleton",
+      "name": "Скелет (Нежить)",
+      "faction": "undead",
+      "speed": 75,
+      "bonuses": "{\"str\": 0, \"agi\": 0, \"int\": 2, \"vit\": -1, \"end\": 2}",
+      "gold_bonus": 0,
+      "racial_skill": "race_skeleton",
+      "desc": "Восставший мертвец. Похищает жизнь врагов. Все живые опасаются вас.",
+      "relations": "Вольный город: Нейтрал | Имперский город: ВРАГИ | Гоблины: ВРАГИ",
+      "sprite_key": null
+    }
+  ],
+  "classes_catalog": [
+    {
+      "id": "warrior",
+      "name": "Воин",
+      "desc": "Мастер ближнего боя с высокой силой и здоровьем.",
+      "stats": "{\"hp\": 75, \"mp\": 25, \"str\": 5, \"agi\": 2, \"int\": 1, \"vit\": 4, \"end\": 2}",
+      "gold": 50,
+      "items": "[\"rusty_sword\", \"leather_armor\", \"potion\"]",
+      "skill": "whirlwind"
+    },
+    {
+      "id": "ranger",
+      "name": "Следопыт",
+      "desc": "Меткий стрелок с высоким шансом критического удара.",
+      "stats": "{\"hp\": 60, \"mp\": 35, \"str\": 2, \"agi\": 5, \"int\": 2, \"vit\": 3, \"end\": 1}",
+      "gold": 60,
+      "items": "[\"hunting_bow\", \"travel_boots\", \"potion\"]",
+      "skill": "volley"
+    },
+    {
+      "id": "mage",
+      "name": "Чародей",
+      "desc": "Повелитель стихий с большим запасом и регеном маны.",
+      "stats": "{\"hp\": 50, \"mp\": 55, \"str\": 1, \"agi\": 2, \"int\": 5, \"vit\": 2, \"end\": 1}",
+      "gold": 55,
+      "items": "[\"fire_staff\", \"mana_potion\", \"potion\"]",
+      "skill": "ice_bolt"
+    },
+    {
+      "id": "wanderer",
+      "name": "Странник",
+      "desc": "Универсальный искатель приключений с походным рюкзаком.",
+      "stats": "{\"hp\": 65, \"mp\": 35, \"str\": 3, \"agi\": 3, \"int\": 3, \"vit\": 3, \"end\": 2}",
+      "gold": 95,
+      "items": "[\"rusty_sword\", \"small_bag\", \"potion\"]",
+      "skill": "heal_spell"
+    }
+  ],
+  "factions_catalog": [
+    {
+      "id": "player",
+      "name_ru": "Вольные герои",
+      "hostile_to": "[\"monster\", \"undead\"]"
+    },
+    {
+      "id": "town",
+      "name_ru": "Имперский город",
+      "hostile_to": "[\"monster\", \"undead\"]"
+    },
+    {
+      "id": "free_city",
+      "name_ru": "Вольный город (Нейтралы)",
+      "hostile_to": "[]"
+    },
+    {
+      "id": "adventurer",
+      "name_ru": "Гильдия странников",
+      "hostile_to": "[\"monster\", \"undead\"]"
+    },
+    {
+      "id": "monster",
+      "name_ru": "Клан Гоблинов",
+      "hostile_to": "[\"player\", \"town\", \"adventurer\", \"undead\"]"
+    },
+    {
+      "id": "undead",
+      "name_ru": "Легион Нежити",
+      "hostile_to": "[\"player\", \"town\", \"adventurer\", \"monster\"]"
+    }
+  ],
+  "npc_templates": [
+    {
+      "id": "town_merchant",
+      "location_id": "town_square",
+      "name": "Торговец",
+      "x": 240,
+      "y": 130,
+      "color": "[210, 175, 65]",
+      "sprite_key": "npc",
+      "faction": "town",
+      "is_container": 0,
+      "role": "merchant",
+      "speed": 30,
+      "aggro_radius": 95,
+      "capacity": 20,
+      "gold": 300,
+      "stats_json": "{\"hp\": 50, \"mp\": 10, \"str\": 2, \"end\": 0, \"appearance\": \"random\"}",
+      "items_json": "[\"book_whirlwind\", \"book_ice\", \"book_heal\", \"book_blade\", \"fire_staff\", \"hunting_bow\", \"iron_sword\", \"small_bag\", \"potion\", \"mana_potion\", \"speed_potion\", \"shield_potion\", \"antidote\"]",
+      "dialogue_json": "{\"greeting\": \"Лучшие товары во всей округе! Взглянешь на прилавок?\", \"rumor\": \"С монстров у озера падают эссенции редких умений.\", \"teach_profession\": {\"id\": \"merchant\", \"cost\": 40, \"text\": \"Секрет торговли прост: покупай дешевле, продавай дороже! Теперь ты знаешь толк в ценах.\"}}"
+
+    },
+    {
+      "id": "free_merchant",
+      "location_id": "town_square",
+      "name": "Вольный купец",
+      "x": 215,
+      "y": 230,
+      "color": "[210, 175, 65]",
+      "sprite_key": "npc",
+      "faction": "free_city",
+      "is_container": 0,
+      "role": "merchant",
+      "speed": 30,
+      "aggro_radius": 95,
+      "capacity": 18,
+      "gold": 250,
+      "stats_json": "{\"hp\": 55, \"mp\": 10, \"str\": 2, \"end\": 1, \"appearance\": \"random\"}",
+      "items_json": "[\"potion\", \"mana_potion\", \"speed_potion\", \"antidote\", \"hunting_bow\", \"book_ice\", \"small_bag\"]",
+      "dialogue_json": "{\"greeting\": \"Добро пожаловать! У меня лучшие товары без лишних вопросов о твоей расе.\", \"rumor\": \"Я скупаю редкие рубины. Если добудешь один — приноси!\", \"progress_text\": \"Добудь Рубин и принеси мне.\", \"quest\": {\"id\": \"q_merchant_gem\", \"title\": \"Заказ на Рубин\", \"desc\": \"Принесите 1 Рубин Вольному купцу.\", \"target_type\": \"collect\", \"target_id\": \"gem\", \"count\": 1, \"gold\": 90, \"xp\": 80, \"item\": \"mage_ring\", \"accept_text\": \"Договорились! Как только Рубин будет в рюкзаке — заходи.\", \"complete_text\": \"Какой чистый камень! Держи обещанное золото и кольцо мага.\"}}"
+    },
+    {
+      "id": "town_guard",
+      "location_id": "town_square",
+      "name": "Стражник",
+      "x": 280,
+      "y": 155,
+      "color": "[180, 60, 60]",
+      "sprite_key": "guard",
+      "faction": "town",
+      "is_container": 0,
+      "role": "guard",
+      "speed": 50,
+      "aggro_radius": 110,
+      "capacity": 6,
+      "gold": 20,
+      "stats_json": "{\"hp\": 70, \"mp\": 30, \"str\": 6, \"vit\": 2, \"end\": 2, \"appearance\": \"random\"}",
+      "items_json": "[\"iron_sword\", \"chainmail\", \"book_whirlwind\", \"potion\"]",
+      "dialogue_json": "{\"greeting\": \"Стой! На востоке у озера расплодились твари. Поможешь очистить окрестности?\", \"rumor\": \"Говорят, с древних скелетов падают эссенции ледяной магии.\", \"progress_text\": \"Возвращайся, когда одолеешь хотя бы двух монстров у озера.\", \"teach_profession\": {\"id\": \"blacksmith\", \"cost\": 50, \"text\": \"Я научил тебя основам ковки клинков и лат. Открой книгу ремесел [P]!\"}, \"quest\": {\"id\": \"q_guard_monsters\", \"title\": \"Охота на чудовищ\", \"desc\": \"Победите 2 монстров на востоке площади.\", \"target_type\": \"kill\", \"target_id\": \"monster\", \"count\": 2, \"gold\": 85, \"xp\": 120, \"item\": \"book_heal\", \"accept_text\": \"Отлично! Призови их [M] или найди у озера. Награда ждет!\", \"complete_text\": \"Славная охота! Вот твое золото и книга исцеления.\"}}"
+    },
+    {
+      "id": "town_adventurer",
+      "location_id": "town_square",
+      "name": "Странник",
+      "x": 210,
+      "y": 270,
+      "color": "[70, 130, 210]",
+      "sprite_key": "adventurer",
+      "faction": "adventurer",
+      "is_container": 0,
+      "role": "adventurer",
+      "speed": 55,
+      "aggro_radius": 110,
+      "capacity": 8,
+      "gold": 40,
+      "stats_json": "{\"hp\": 55, \"mp\": 40, \"str\": 4, \"agi\": 4, \"int\": 4, \"vit\": 2, \"end\": 1, \"appearance\": \"random\"}",
+      "items_json": "[\"rusty_sword\", \"book_ice\", \"potion\"]",
+      "dialogue_json": "{\"greeting\": \"Привет, коллега! Ищешь приключения или редкие трофеи?\", \"rumor\": \"Если не успеешь забрать лут — я подберу его сам!\", \"teach_profession\": {\"id\": \"carpenter\", \"cost\": 35, \"text\": \"В походах без умения чинить луки и шить сумки никуда. Пользуйся [P]!\"}}"
+    },
+    {
+      "id": "lake_goblin",
+      "location_id": "town_square",
+      "name": "Гоблин-лучник",
+      "x": 420,
+      "y": 210,
+      "color": "[100, 180, 60]",
+      "sprite_key": "goblin",
+      "faction": "monster",
+      "is_container": 0,
+      "role": "monster",
+      "speed": 45,
+      "aggro_radius": 110,
+      "capacity": 6,
+      "gold": 35,
+      "stats_json": "{\"hp\": 35, \"mp\": 30, \"str\": 3, \"agi\": 5, \"end\": 0, \"appearance\": \"random\"}",
+      "items_json": "[\"hunting_bow\", \"book_volley\", \"gem\"]",
+      "dialogue_json": "{\"greeting\": \"Хе-хе, брат-гоблин! Пойдем пощиплем этих людишек на площади!\", \"rumor\": \"Вольный купец на южной дороге готов торговать с нами.\"}"
+    },
+    {
+      "id": "south_chest",
+      "location_id": "town_square",
+      "name": "Сундук",
+      "x": 230,
+      "y": 310,
+      "color": "[180, 120, 60]",
+      "sprite_key": "chest",
+      "faction": "neutral",
+      "is_container": 1,
+      "role": null,
+      "speed": 0,
+      "aggro_radius": 0,
+      "capacity": 6,
+      "gold": 25,
+      "stats_json": "{}",
+      "items_json": "[\"leather_armor\", \"book_skin\", \"book_mana\"]",
+      "dialogue_json": null
+    }
+  ],
+  "professions_catalog": [
+    {"id": "blacksmith", "name": "Кузнец", "desc": "Ковка железного оружия и прочной брони.", "bonus_type": "craft"},
+    {"id": "carpenter", "name": "Плотник", "desc": "Изготовление луков, посохов и походных сумок.", "bonus_type": "craft"},
+    {"id": "alchemist", "name": "Алхимик", "desc": "Варка целебных, магических и усиливающих зелий.", "bonus_type": "craft"},
+    {"id": "merchant", "name": "Торговец", "desc": "Выгодные цены при покупке (-15%) и продаже (+20%).", "bonus_type": "trade"}
+  ],
+  "recipes_catalog": [
+    {"id": "rec_iron_sword", "prof_id": "blacksmith", "result_item_id": "iron_sword", "req_level": 1, "materials_json": "{\"iron_ore\": 2, \"wood_log\": 1}", "xp_gain": 35},
+    {"id": "rec_chainmail", "prof_id": "blacksmith", "result_item_id": "chainmail", "req_level": 1, "materials_json": "{\"iron_ore\": 3, \"leather_piece\": 1}", "xp_gain": 40},
+    {"id": "rec_hunting_bow", "prof_id": "carpenter", "result_item_id": "hunting_bow", "req_level": 1, "materials_json": "{\"wood_log\": 2, \"leather_piece\": 1}", "xp_gain": 30},
+    {"id": "rec_small_bag", "prof_id": "carpenter", "result_item_id": "small_bag", "req_level": 1, "materials_json": "{\"leather_piece\": 2}", "xp_gain": 25},
+    {"id": "rec_potion", "prof_id": "alchemist", "result_item_id": "potion", "req_level": 1, "materials_json": "{\"herb_leaf\": 2}", "xp_gain": 20},
+    {"id": "rec_speed_potion", "prof_id": "alchemist", "result_item_id": "speed_potion", "req_level": 1, "materials_json": "{\"herb_leaf\": 2, \"wood_log\": 1}", "xp_gain": 25}
+  ],
+  "monster_archetypes": [
+    {
+      "id": "goblin",
+      "name_ru": "Гоблин",
+      "base_hp": 30,
+      "base_atk": 3,
+      "speed": 45,
+      "faction": "monster",
+      "possible_skills": "[\"volley\", \"whirlwind\", \"passive_blade\"]"
+    },
+    {
+      "id": "skeleton",
+      "name_ru": "Скелет",
+      "base_hp": 35,
+      "base_atk": 4,
+      "speed": 42,
+      "faction": "undead",
+      "possible_skills": "[\"ice_bolt\", \"heal_spell\", \"passive_mana\", \"passive_blade\"]"
+    },
+    {
+      "id": "slime",
+      "name_ru": "Слизень",
+      "base_hp": 42,
+      "base_atk": 2,
+      "speed": 35,
+      "faction": "monster",
+      "possible_skills": "[\"passive_skin\", \"passive_mana\", \"heal_spell\"]"
+    }
+  ],
+  "monster_parts": [
+    {
+      "id": "body_goblin",
+      "part_type": "body",
+      "archetype": "goblin",
+      "art_matrix": "[\"................\", \"................\", \"................\", \"................\", \"................\", \".....KKKKKK.....\", \"....KMMMMMMK....\", \"...KmMMMMMMmK...\", \"..KMKMMMMMMKMK..\", \"..KK.LLLLLL.KK..\", \"....KLLLLLLK....\", \"....KLL..LLK....\", \"....Kmm..mmK....\", \"...Kmmm..mmmK...\", \"...KKKK..KKKK...\", \"................\"]"
+    },
+    {
+      "id": "head_goblin_hood",
+      "part_type": "head",
+      "archetype": "goblin",
+      "art_matrix": "[\".....KKKKKK.....\", \"....KMMMMMMK....\", \"..KKKMMMMMMKKK..\", \".KmmMMEMMEMMmmK.\", \"..KKKMMMMMMKKK..\", \"....KmMMMMmK....\", \".....KKKKKK.....\", \"................\", \"................\", \"................\", \"................\", \"................\", \"................\", \"................\", \"................\", \"................\"]"
+    },
+    {
+      "id": "head_goblin_mohawk",
+      "part_type": "head",
+      "archetype": "goblin",
+      "art_matrix": "[\"......KKKK......\", \".....KRRRRK.....\", \"....KMMMMMMK....\", \"..KKKMMMMMMKKK..\", \".KmmMMEMMEMMmmK.\", \"....KmMMMMmK....\", \".....KKKKKK.....\", \"................\", \"................\", \"................\", \"................\", \"................\", \"................\", \"................\", \"................\", \"................\"]"
+    },
+    {
+      "id": "body_ribcage",
+      "part_type": "body",
+      "archetype": "skeleton",
+      "art_matrix": "[\"................\", \"................\", \"................\", \"................\", \"................\", \".....KKKKKK.....\", \"....KMMMMMMK....\", \"...KMKmMMmKMK...\", \"..KMK.MMMM.KMK..\", \"..KK.KmMMmK.KK..\", \"....KMMMMMMK....\", \"....KMM..MMK....\", \"....Kmm..mmK....\", \"...KMMM..MMMK...\", \"...KKKK..KKKK...\", \"................\"]"
+    },
+    {
+      "id": "head_skull",
+      "part_type": "head",
+      "archetype": "skeleton",
+      "art_matrix": "[\".....KKKKKK.....\", \"....KMMMMMMK....\", \"...KMMMMMMMMK...\", \"...KMMEmmEMMK...\", \"....KMMMMMMK....\", \"....KMmMmMmK....\", \".....KKKKKK.....\", \"................\", \"................\", \"................\", \"................\", \"................\", \"................\", \"................\", \"................\", \"................\"]"
+    },
+    {
+      "id": "head_skull_horns",
+      "part_type": "head",
+      "archetype": "skeleton",
+      "art_matrix": "[\"..KK........KK..\", \".KYYKKKKKKKKYYK.\", \"..KYMMMMMMMMYK..\", \"...KMMEmmEMMK...\", \"....KMMMMMMK....\", \"....KMmMmMmK....\", \".....KKKKKK.....\", \"................\", \"................\", \"................\", \"................\", \"................\", \"................\", \"................\", \"................\", \"................\"]"
+    },
+    {
+      "id": "body_slime",
+      "part_type": "body",
+      "archetype": "slime",
+      "art_matrix": "[\"................\", \"................\", \"................\", \"......KKKK......\", \"....KKMMMMKK....\", \"...KMMMMMMMMK...\", \"..KMMMMMMMMMMK..\", \".KMMEMMMMMMEMMK.\", \".KMMMMMMMMMMMMK.\", \"KMMMMMMMMMMMMMMK\", \"KmMMMMMMMMMMMMmK\", \"KmmMMMMMMMMMMmmK\", \".KmmmmmmmmmmmmK.\", \"..KKKKKKKKKKKK..\", \"................\", \"................\"]"
+    }
+  ]
+}

@@ -1,6 +1,7 @@
 import pygame
 import math
 from factions import are_hostile
+import random
 
 class Projectile:
     def __init__(self, x, y, dx, dy, owner, damage, kind="arrow"):
@@ -107,56 +108,71 @@ class Combat:
                 self.swing_rect = None
 
     def attack(self, world, aim_pos=None):
-        if self.timer > 0 or not self.owner.stats:
+        if self.timer > 0 or not self.owner.stats or self.owner.stats.hp <= 0:
             return False
 
         style = self.get_weapon_style()
-        atk_power = self.owner.stats.get_atk(style)
+        cx, cy = self.owner.rect.center
 
-        # Дальний бой и магия
+        if aim_pos is not None:
+            ax, ay = aim_pos
+            vx, vy = ax - cx, ay - cy
+            dist = math.hypot(vx, vy)
+            if dist > 0.001:
+                dx, dy = vx / dist, vy / dist
+            else:
+                dx, dy = (-1.0 if self.owner.facing_left else 1.0), 0.0
+            self.owner.facing_left = (dx < 0)
+        else:
+            dx = -1.0 if self.owner.facing_left else 1.0
+            dy = 0.0
+
+        # --- ДАЛЬНИЙ БОЙ (ЛУК ИЛИ ПОСОХ) ---
         if style in ("bow", "staff"):
             if style == "staff":
                 if self.owner.stats.mp < 10:
-                    self.owner.say("Мало маны!", 0.8)
                     return False
                 self.owner.stats.mp -= 10
 
-            self.timer = self.cooldown + (0.15 if style == "staff" else 0.05)
-            self.swing_timer = 0.12
+            self.timer = self.cooldown
+            self.swing_timer = 0.18
+            base_dmg = self.owner.stats.get_atk(style)
+            is_crit = random.randint(1, 100) <= self.owner.stats.crit_chance
+            dmg = int(base_dmg * 1.6) if is_crit else base_dmg
 
-            if aim_pos:
-                ax, ay = aim_pos
-                dx = ax - self.owner.rect.centerx
-                dy = ay - self.owner.rect.centery
-                dist = math.hypot(dx, dy)
-                dx, dy = (dx / dist, dy / dist) if dist > 0 else self.owner.facing_dir
-                if dx != 0:
-                    self.owner.facing_left = (dx < 0)
-            else:
-                dx, dy = self.owner.facing_dir
-
-            kind = "arrow" if style == "bow" else "fireball"
-            proj = Projectile(self.owner.rect.centerx + dx * 6, self.owner.rect.centery, dx, dy, self.owner, atk_power, kind)
+            p_kind = "fireball" if style == "staff" else "arrow"
+            proj = Projectile(cx + dx * 8, cy + dy * 8, dx, dy, self.owner, dmg, p_kind)
             world.projectiles.append(proj)
             return True
 
-        # Ближний бой
+        # --- БЛИЖНИЙ БОЙ (МЕЧ / РУКОПАШНАЯ НА 360°) ---
         self.timer = self.cooldown
-        self.swing_timer = 0.16
+        self.swing_timer = 0.18
 
-        reach = self.attack_range + 4
-        hit_x = self.owner.rect.centerx - reach if self.owner.facing_left else self.owner.rect.centerx
-        self.swing_rect = pygame.Rect(hit_x, self.owner.rect.top - 6, reach, self.owner.rect.height + 12)
+        hit_cx = int(cx + dx * 13)
+        hit_cy = int(cy + dy * 13)
+        self.swing_rect = pygame.Rect(0, 0, 24, 24)
+        self.swing_rect.center = (hit_cx, hit_cy)
 
-        for target in world.entities:
-            if target is self.owner or not target.stats or target.stats.hp <= 0:
+        base_dmg = self.owner.stats.get_atk("melee")
+        for ent in list(world.entities):
+            if ent is self.owner or not ent.stats or ent.stats.hp <= 0:
                 continue
-            if self.swing_rect.colliderect(target.rect):
-                dx = target.rect.centerx - self.owner.rect.centerx
-                dy = target.rect.centery - self.owner.rect.centery
-                dist = math.hypot(dx, dy)
-                k_dir = (dx / dist, dy / dist) if dist > 0 else ((-1 if self.owner.facing_left else 1), 0)
-                target.take_damage(atk_power, attacker=self.owner, knockback_dir=k_dir, walls=world.walls)
+            if ent.faction == self.owner.faction and not are_hostile(self.owner, ent):
+                continue
+            if self.swing_rect.colliderect(ent.rect):
+                is_crit = random.randint(1, 100) <= self.owner.stats.crit_chance
+                raw_dmg = int(base_dmg * 1.6) if is_crit else base_dmg
+                ent.take_damage(
+                    raw_dmg,
+                    attacker=self.owner,
+                    is_magic=False,
+                    knockback_dir=(dx, dy),
+                    walls=world.walls
+                )
+                if is_crit:
+                    ent.say("КРИТ!", 0.8)
+
         return True
 
     def draw(self, surface):

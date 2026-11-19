@@ -47,6 +47,64 @@ class BaseMenu:
         return rows
 
     def handle_submode_event(self, event):
+        box = pygame.Rect(210, 95, 860, 520)
+
+        # --- УПРАВЛЕНИЕ МЫШЬЮ В ПОДМЕНЮ ---
+        if event.type in (pygame.MOUSEMOTION, pygame.MOUSEBUTTONDOWN):
+            mx, my = event.pos
+            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 3:
+                self.sub_mode = None
+                self.sub_cursor = 0
+                return None
+
+            if self.sub_mode == "help":
+                if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                    self.sub_mode = None
+                return None
+
+            elif self.sub_mode == "settings" and self.db:
+                for idx in range(4):
+                    row_rect = pygame.Rect(box.x + 30, box.y + 82 + idx * 68, box.width - 60, 50)
+                    if row_rect.collidepoint(mx, my):
+                        self.sub_cursor = idx
+                        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                            delta = -1 if mx < box.centerx else 1
+                            if idx == 0:
+                                cur_val = self.db.settings["autosave_minutes"]
+                                i = AUTOSAVE_OPTIONS.index(cur_val) if cur_val in AUTOSAVE_OPTIONS else 2
+                                self.db.settings["autosave_minutes"] = AUTOSAVE_OPTIONS[(i + delta) % len(AUTOSAVE_OPTIONS)]
+                                self.db.save_settings()
+                            elif idx == 1:
+                                self.db.settings["show_speech"] = not self.db.settings["show_speech"]
+                                self.db.save_settings()
+                            elif idx == 2:
+                                cur_fps = self.db.settings["target_fps"]
+                                i = FPS_OPTIONS.index(cur_fps) if cur_fps in FPS_OPTIONS else 0
+                                self.db.settings["target_fps"] = FPS_OPTIONS[(i + delta) % len(FPS_OPTIONS)]
+                                self.db.save_settings()
+                            elif idx == 3:
+                                self.sub_mode = None
+                        break
+                return None
+
+            elif self.sub_mode in ("save_select", "load_select"):
+                for_saving = (self.sub_mode == "save_select")
+                rows = self.get_save_rows(for_saving)
+                if not rows:
+                    if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                        self.sub_mode = None
+                    return None
+                for idx in range(min(8, len(rows))):
+                    row_rect = pygame.Rect(box.x + 25, box.y + 66 + idx * 48, box.width - 50, 40)
+                    if row_rect.collidepoint(mx, my):
+                        self.sub_cursor = idx
+                        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                            slot_val, _ = rows[idx]
+                            self.sub_mode = None
+                            return ("do_save" if for_saving else "do_load", slot_val)
+                        break
+                return None
+
         if event.type != pygame.KEYDOWN:
             return None
 
@@ -104,11 +162,41 @@ class BaseMenu:
         return None
 
     def handle_event(self, event):
-        if event.type != pygame.KEYDOWN:
-            return None
-
         if self.sub_mode is not None:
             return self.handle_submode_event(event)
+
+        # --- УПРАВЛЕНИЕ МЫШЬЮ В ОСНОВНОМ МЕНЮ ---
+        if event.type in (pygame.MOUSEMOTION, pygame.MOUSEBUTTONDOWN):
+            mx, my = event.pos
+            is_pause = isinstance(self, PauseMenu)
+            if is_pause:
+                box_w, box_h = 440, 505
+                box_x = WINDOW_WIDTH // 2 - box_w // 2
+                box_y = WINDOW_HEIGHT // 2 - box_h // 2
+                btn_x, btn_w, btn_h = box_x + 25, box_w - 50, 44
+                start_y, step_y = box_y + 62, 56
+            else:
+                menu_w = 420
+                menu_x = WINDOW_WIDTH // 2 - menu_w // 2
+                btn_x, btn_w, btn_h = menu_x + 25, menu_w - 50, 50
+                start_y, step_y = 229, 65
+
+            for idx in range(len(self.options)):
+                btn_rect = pygame.Rect(btn_x, start_y + idx * step_y, btn_w, btn_h)
+                if btn_rect.collidepoint(mx, my):
+                    self.cursor = idx
+                    self.notice = ""
+                    if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                        action_id, _ = self.options[idx]
+                        if action_id in ("help", "settings", "save_select", "load_select"):
+                            self.sub_mode = action_id
+                            self.sub_cursor = 0
+                            return None
+                        return (action_id, None)
+                    break
+
+        if event.type != pygame.KEYDOWN:
+            return None
 
         if event.key in (pygame.K_UP, pygame.K_w):
             self.cursor = (self.cursor - 1) % len(self.options)
@@ -125,6 +213,7 @@ class BaseMenu:
             return (action_id, None)
 
         return None
+
     def draw_submode_overlay(self, surface):
         box = pygame.Rect(210, 95, 860, 520)
         pygame.draw.rect(surface, (20, 24, 34), box, border_radius=8)
@@ -150,9 +239,9 @@ class BaseMenu:
             fps_str = f"{self.db.settings['target_fps']} FPS"
 
             rows = [
-                f"Автосохранение:      ◀  {auto_str}  ▶",
-                f"Реплики над головой: ◀  {speech_str}  ▶",
-                f"Частота кадров:      ◀  {fps_str}  ▶",
+                f"Автосохранение:      ◀  {auto_str}  >",
+                f"Реплики над головой: ◀  {speech_str}  >",
+                f"Частота кадров:      ◀  {fps_str}  >",
                 "Вернуться назад"
             ]
             for idx, txt_str in enumerate(rows):
@@ -161,7 +250,7 @@ class BaseMenu:
                 if is_sel:
                     pygame.draw.rect(surface, (45, 58, 82), (box.x + 30, y - 8, box.width - 60, 50), border_radius=5)
                 col = (255, 255, 255) if is_sel else (190, 200, 215)
-                prefix = "▶ " if is_sel else "  "
+                prefix = "> " if is_sel else "  "
                 surface.blit(self.font_title.render(f"{prefix}{txt_str}", True, col), (box.x + 50, y + 6))
 
             foot = self.font_small.render("W/S: Выбор  |  A/D: Изменить параметр  |  ESC: Назад", True, (150, 175, 205))
@@ -184,7 +273,7 @@ class BaseMenu:
                     if is_sel:
                         pygame.draw.rect(surface, (45, 58, 82), (box.x + 25, y - 6, box.width - 50, 40), border_radius=4)
                     col = (120, 235, 150) if s_id == "new_slot" else ((255, 255, 255) if is_sel else (195, 205, 220))
-                    prefix = "▶ " if is_sel else "  "
+                    prefix = "> " if is_sel else "  "
                     surface.blit(self.font_main.render(f"{prefix}{label}", True, col), (box.x + 35, y + 4))
 
             foot = self.font_small.render("W/S: Выбор слота  |  Enter: Подтвердить  |  ESC: Отмена", True, (150, 175, 205))
@@ -233,7 +322,7 @@ class MainMenu(BaseMenu):
                 pygame.draw.rect(surface, (240, 195, 75), btn_rect, 2, border_radius=6)
 
             col = (255, 255, 255) if is_sel else (180, 185, 200)
-            prefix = "▶ " if is_sel else "  "
+            prefix = "> " if is_sel else "  "
             txt = self.font_title.render(f"{prefix}{label}", True, col)
             surface.blit(txt, (btn_rect.x + 20, btn_rect.centery - txt.get_height() // 2))
 
@@ -293,7 +382,7 @@ class PauseMenu(BaseMenu):
                 pygame.draw.rect(surface, (240, 195, 75), btn_rect, 1, border_radius=6)
 
             col = (255, 255, 255) if is_sel else (185, 190, 205)
-            prefix = "▶ " if is_sel else "  "
+            prefix = "> " if is_sel else "  "
             txt = self.font_main.render(f"{prefix}{label}", True, col)
             surface.blit(txt, (btn_rect.x + 18, btn_rect.centery - txt.get_height() // 2))
 

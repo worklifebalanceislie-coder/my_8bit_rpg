@@ -52,6 +52,7 @@ class RPGContentStudio:
         self.build_factions_tab()
         self.build_monsters_tab()
         self.build_professions_tab()
+        self.build_npcs_tab()
 
         self.status_var = tk.StringVar(value="База данных rpg.db подключена и готова к работе.")
         ttk.Label(self.root, textvariable=self.status_var, relief=tk.SUNKEN, anchor=tk.W).pack(fill=tk.X, side=tk.BOTTOM)
@@ -118,6 +119,7 @@ class RPGContentStudio:
         self.refresh_factions_table()
         self.refresh_monsters_tables()
         self.refresh_professions_tables()
+        self.refresh_npcs_table()
     
     def build_sprites_tab(self):
         tab = ttk.Frame(self.notebook, padding=10)
@@ -128,6 +130,28 @@ class RPGContentStudio:
         ttk.Label(left, text="Холст 16x16 (ЛКМ — рисовать, ПКМ — стереть)", font=("Segoe UI", 10, "bold")).pack(pady=4)
 
         self.cell_size = 26
+        left = ttk.Frame(tab)
+        left.pack(side=tk.LEFT, fill=tk.Y, padx=10)
+        ttk.Label(left, text="Холст 16x16 (ЛКМ — рисовать, ПКМ — стереть)", font=("Segoe UI", 10, "bold")).pack(pady=4)
+
+        guide_bar = ttk.Frame(left)
+        guide_bar.pack(fill=tk.X, pady=(0, 4))
+        ttk.Label(guide_bar, text="Ориентир:").pack(side=tk.LEFT)
+        self.guide_var = tk.StringVar(value="Нет")
+        guide_cb = ttk.Combobox(
+            guide_bar, textvariable=self.guide_var, state="readonly", width=28,
+            values=[
+                "Нет",
+                "Персонаж (голова / торс / ноги)",
+                "Оружие (угол клинка и рукоять)",
+                "Броня (зона нагрудника)",
+                "Монстр: Голова (верх 0..6)",
+                "Монстр: Туловище (низ 5..14)"
+            ]
+        )
+        guide_cb.pack(side=tk.LEFT, padx=6)
+        guide_cb.bind("<<ComboboxSelected>>", lambda *_: self.redraw_sprite_canvas())
+
         self.canvas = tk.Canvas(left, width=16 * self.cell_size, height=16 * self.cell_size, bg="#1e222d", highlightthickness=1)
         self.canvas.pack()
         self.canvas.bind("<Button-1>", lambda e: self.paint_cell(e, erase=False))
@@ -210,6 +234,38 @@ class RPGContentStudio:
                 self.canvas.create_rectangle(x1, y1, x1 + self.cell_size, y1 + self.cell_size, fill=fill, outline="#3c4254")
                 if rgb:
                     self.preview_canvas.create_rectangle(c * 4, r * 4, c * 4 + 4, r * 4 + 4, fill=fill, outline="")
+        self.draw_guide_overlay()
+
+    def draw_guide_overlay(self):
+        mode = getattr(self, "guide_var", None)
+        if not mode:
+            return
+        g = mode.get()
+        cs = self.cell_size
+
+        def box(c1, r1, c2, r2, color, label=""):
+            self.canvas.create_rectangle(c1 * cs + 2, r1 * cs + 2, (c2 + 1) * cs - 2, (r2 + 1) * cs - 2, outline=color, width=2, dash=(4, 2))
+            if label:
+                self.canvas.create_text(c1 * cs + 6, r1 * cs + 10, text=label, fill=color, anchor=tk.W, font=("Consolas", 8, "bold"))
+
+        if g.startswith("Персонаж"):
+            box(4, 1, 11, 6, "#66d9ef", "Голова")
+            box(3, 7, 12, 11, "#a6e22e", "Торс/Руки")
+            box(4, 12, 11, 15, "#fd971f", "Ноги")
+        elif g.startswith("Оружие"):
+            # Диагональная ось клинка/посоха
+            self.canvas.create_line(7 * cs + cs // 2, 11 * cs + cs // 2, 15 * cs + cs // 2, 2 * cs + cs // 2, fill="#f92672", width=2, dash=(5, 3))
+            box(7, 9, 10, 11, "#e6db74", "Рукоять")
+            box(10, 2, 15, 8, "#66d9ef", "Лезвие")
+        elif g.startswith("Броня"):
+            box(4, 1, 11, 6, "#555e70", "Голова (фон)")
+            box(3, 7, 12, 11, "#a6e22e", "Зона брони")
+        elif g.startswith("Монстр: Голова"):
+            box(3, 0, 12, 6, "#66d9ef", "Зона головы")
+            self.canvas.create_line(0, 6 * cs, 16 * cs, 6 * cs, fill="#fd971f", width=2, dash=(4, 2))
+        elif g.startswith("Монстр: Туловище"):
+            self.canvas.create_line(0, 6 * cs, 16 * cs, 6 * cs, fill="#66d9ef", width=2, dash=(4, 2))
+            box(3, 6, 12, 14, "#a6e22e", "Тело и ноги")
 
     def import_png_sprites(self):
         paths = filedialog.askopenfilenames(title="Выберите изображения (PNG/JPG/BMP)", filetypes=[("Изображения", "*.png *.jpg *.jpeg *.bmp")])
@@ -1241,6 +1297,247 @@ class RPGContentStudio:
             self.db.conn.execute("DELETE FROM recipes_catalog WHERE id = ?", (rid,))
             self.db.conn.commit()
             self.refresh_professions_tables()
+
+    # =========================================================================
+    # 9. ВКЛАДКА НПС И КОНСТРУКТОРА ВНЕШНОСТИ
+    # =========================================================================
+    def build_npcs_tab(self):
+        from appearance import BODY_LAYERS, HEAD_LAYERS, HAIR_LAYERS, SKIN_COLORS, HAIR_COLORS, EYE_COLORS, CLOTH_COLORS
+
+        tab = ttk.Frame(self.notebook, padding=10)
+        self.notebook.add(tab, text="9. НПС и Внешность")
+
+        # Левая колонка: Основные параметры НПС
+        left = ttk.LabelFrame(tab, text="Параметры НПС / Объекта", padding=8)
+        left.pack(side=tk.LEFT, fill=tk.Y, padx=(0, 8))
+
+        self.npc_id = tk.StringVar()
+        self.npc_loc = tk.StringVar(value="town_square")
+        self.npc_name = tk.StringVar()
+        self.npc_x = tk.IntVar(value=250)
+        self.npc_y = tk.IntVar(value=180)
+        self.npc_faction = tk.StringVar(value="town")
+        self.npc_role = tk.StringVar(value="merchant")
+        self.npc_sprite = tk.StringVar(value="npc")
+        self.npc_speed = tk.IntVar(value=35)
+        self.npc_gold = tk.IntVar(value=100)
+        self.npc_hp = tk.IntVar(value=60)
+        self.npc_str = tk.IntVar(value=3)
+        self.npc_items = tk.StringVar(value="potion, mana_potion")
+        self.npc_greet = tk.StringVar(value="Приветствую, путник!")
+        self.npc_teach = tk.StringVar(value="")
+
+        rows = [
+            ("ID шаблона:", ttk.Entry(left, textvariable=self.npc_id, width=24)),
+            ("Локация:", ttk.Entry(left, textvariable=self.npc_loc, width=24)),
+            ("Имя в игре:", ttk.Entry(left, textvariable=self.npc_name, width=24)),
+            ("Координата X:", ttk.Spinbox(left, from_=16, to=2000, textvariable=self.npc_x, width=10)),
+            ("Координата Y:", ttk.Spinbox(left, from_=16, to=2000, textvariable=self.npc_y, width=10)),
+            ("Фракция:", ttk.Combobox(left, textvariable=self.npc_faction, width=21, values=self.get_faction_ids())),
+            ("Роль ИИ:", ttk.Combobox(left, textvariable=self.npc_role, state="readonly", width=21, values=["", "merchant", "guard", "adventurer", "monster"])),
+            ("Запасной спрайт:", ttk.Combobox(left, textvariable=self.npc_sprite, width=21, values=self.get_sprite_keys())),
+            ("Скорость / Золото:", self.make_dual_spin(left, self.npc_speed, self.npc_gold)),
+            ("HP / Сила:", self.make_dual_spin(left, self.npc_hp, self.npc_str)),
+            ("Предметы (ID):", ttk.Entry(left, textvariable=self.npc_items, width=24)),
+            ("Приветствие:", ttk.Entry(left, textvariable=self.npc_greet, width=24)),
+            ("Обучает профессии:", ttk.Combobox(left, textvariable=self.npc_teach, width=21, values=[""] + self.get_prof_ids())),
+        ]
+        for idx, (lbl, w) in enumerate(rows):
+            ttk.Label(left, text=lbl).grid(row=idx, column=0, sticky=tk.W, pady=2)
+            w.grid(row=idx, column=1, sticky=tk.W, pady=2, padx=4)
+
+        # Средняя колонка: Конструктор внешности из запчастей
+        mid = ttk.LabelFrame(tab, text="Внешность (Запчасти)", padding=8)
+        mid.pack(side=tk.LEFT, fill=tk.Y, padx=(0, 8))
+
+        self.npc_app_mode = tk.StringVar(value="custom")
+        ttk.Radiobutton(mid, text="Обычный спрайт (без сборки)", variable=self.npc_app_mode, value="sprite", command=self.update_npc_preview).pack(anchor=tk.W)
+        ttk.Radiobutton(mid, text="Случайная при старте", variable=self.npc_app_mode, value="random", command=self.update_npc_preview).pack(anchor=tk.W)
+        ttk.Radiobutton(mid, text="Собрать из запчастей:", variable=self.npc_app_mode, value="custom", command=self.update_npc_preview).pack(anchor=tk.W, pady=(0, 6))
+
+        self.npc_preview_cv = tk.Canvas(mid, width=64, height=64, bg="#232734", highlightthickness=1)
+        self.npc_preview_cv.pack(pady=4)
+
+        self.app_body_var = tk.StringVar(value="tunic")
+        self.app_head_var = tk.StringVar(value="human")
+        self.app_hair_var = tk.StringVar(value="short")
+        self.app_skin_var = tk.IntVar(value=0)
+        self.app_hair_col_var = tk.IntVar(value=0)
+        self.app_eye_col_var = tk.IntVar(value=0)
+        self.app_cloth_col_var = tk.IntVar(value=0)
+
+        app_controls = [
+            ("Одежда:", ttk.Combobox(mid, textvariable=self.app_body_var, state="readonly", width=18, values=list(BODY_LAYERS.keys()))),
+            ("Голова:", ttk.Combobox(mid, textvariable=self.app_head_var, state="readonly", width=18, values=list(HEAD_LAYERS.keys()))),
+            ("Прическа:", ttk.Combobox(mid, textvariable=self.app_hair_var, state="readonly", width=18, values=list(HAIR_LAYERS.keys()))),
+            ("Кожа (индекс):", ttk.Spinbox(mid, from_=0, to=len(SKIN_COLORS)-1, textvariable=self.app_skin_var, width=6, command=self.update_npc_preview)),
+            ("Цвет волос:", ttk.Spinbox(mid, from_=0, to=len(HAIR_COLORS)-1, textvariable=self.app_hair_col_var, width=6, command=self.update_npc_preview)),
+            ("Цвет глаз:", ttk.Spinbox(mid, from_=0, to=len(EYE_COLORS)-1, textvariable=self.app_eye_col_var, width=6, command=self.update_npc_preview)),
+            ("Цвет одежды:", ttk.Spinbox(mid, from_=0, to=len(CLOTH_COLORS)-1, textvariable=self.app_cloth_col_var, width=6, command=self.update_npc_preview)),
+        ]
+        app_grid = ttk.Frame(mid)
+        app_grid.pack(fill=tk.X, pady=4)
+
+        app_controls = [
+            ("Одежда:", ttk.Combobox(app_grid, textvariable=self.app_body_var, state="readonly", width=18, values=list(BODY_LAYERS.keys()))),
+            ("Голова:", ttk.Combobox(app_grid, textvariable=self.app_head_var, state="readonly", width=18, values=list(HEAD_LAYERS.keys()))),
+            ("Прическа:", ttk.Combobox(app_grid, textvariable=self.app_hair_var, state="readonly", width=18, values=list(HAIR_LAYERS.keys()))),
+            ("Кожа (индекс):", ttk.Spinbox(app_grid, from_=0, to=len(SKIN_COLORS)-1, textvariable=self.app_skin_var, width=6, command=self.update_npc_preview)),
+            ("Цвет волос:", ttk.Spinbox(app_grid, from_=0, to=len(HAIR_COLORS)-1, textvariable=self.app_hair_col_var, width=6, command=self.update_npc_preview)),
+            ("Цвет глаз:", ttk.Spinbox(app_grid, from_=0, to=len(EYE_COLORS)-1, textvariable=self.app_eye_col_var, width=6, command=self.update_npc_preview)),
+            ("Цвет одежды:", ttk.Spinbox(app_grid, from_=0, to=len(CLOTH_COLORS)-1, textvariable=self.app_cloth_col_var, width=6, command=self.update_npc_preview)),
+        ]
+        for idx, (lbl, widget) in enumerate(app_controls):
+            ttk.Label(app_grid, text=lbl).grid(row=idx, column=0, sticky=tk.W, pady=2)
+            widget.grid(row=idx, column=1, sticky=tk.W, pady=2, padx=4)
+            if isinstance(widget, ttk.Combobox):
+                widget.bind("<<ComboboxSelected>>", lambda *_: self.update_npc_preview())
+
+        btns = ttk.Frame(mid)
+        btns.pack(pady=10)
+        ttk.Button(btns, text="Сохранить НПС", command=self.save_npc).pack(side=tk.LEFT, padx=3)
+        ttk.Button(btns, text="Удалить", command=self.delete_npc).pack(side=tk.LEFT, padx=3)
+
+        # Правая колонка: Таблица всех НПС в базе
+        right = ttk.Frame(tab)
+        right.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+
+        self.npc_tree = ttk.Treeview(right, columns=("id", "loc", "name", "role", "pos"), show="headings")
+        for c, t, w in [("id", "ID", 110), ("loc", "Локация", 100), ("name", "Имя", 130), ("role", "Роль", 85), ("pos", "X, Y", 80)]:
+            self.npc_tree.heading(c, text=t)
+            self.npc_tree.column(c, width=w)
+        self.npc_tree.pack(fill=tk.BOTH, expand=True)
+        self.npc_tree.bind("<<TreeviewSelect>>", self.on_npc_select)
+
+        self.update_npc_preview()
+        self.refresh_npcs_table()
+
+    def make_dual_spin(self, parent, var1, var2):
+        f = ttk.Frame(parent)
+        ttk.Spinbox(f, from_=0, to=2000, textvariable=var1, width=7).pack(side=tk.LEFT, padx=(0, 4))
+        ttk.Spinbox(f, from_=0, to=5000, textvariable=var2, width=7).pack(side=tk.LEFT)
+        return f
+
+    def get_current_npc_app_dict(self):
+        return {
+            "body": self.app_body_var.get(),
+            "head": self.app_head_var.get(),
+            "hair": self.app_hair_var.get(),
+            "skin": self.app_skin_var.get(),
+            "hair_color": self.app_hair_col_var.get(),
+            "eye_color": self.app_eye_col_var.get(),
+            "cloth_color": self.app_cloth_col_var.get(),
+        }
+
+    def update_npc_preview(self):
+        from appearance import build_character_sprite
+        self.npc_preview_cv.delete("all")
+        if self.npc_app_mode.get() == "custom":
+            surf = build_character_sprite(self.get_current_npc_app_dict())
+            for y in range(16):
+                for x in range(16):
+                    r, g, b, a = surf.get_at((x, y))
+                    if a > 0:
+                        self.npc_preview_cv.create_rectangle(x * 4, y * 4, x * 4 + 4, y * 4 + 4, fill=rgb_to_hex((r, g, b)), outline="")
+
+    def refresh_npcs_table(self):
+        for r in self.npc_tree.get_children():
+            self.npc_tree.delete(r)
+        cur = self.db.conn.cursor()
+        cur.execute("SELECT * FROM npc_templates ORDER BY location_id, name")
+        for r in cur.fetchall():
+            self.npc_tree.insert("", tk.END, values=(r["id"], r["location_id"], r["name"], r["role"] or "chest", f"{r['x']}, {r['y']}"))
+
+    def on_npc_select(self, _):
+        sel = self.npc_tree.selection()
+        if not sel:
+            return
+        nid, *_ = self.npc_tree.item(sel)["values"]
+        cur = self.db.conn.cursor()
+        cur.execute("SELECT * FROM npc_templates WHERE id = ?", (nid,))
+        r = cur.fetchone()
+        if not r:
+            return
+
+        self.npc_id.set(r["id"])
+        self.npc_loc.set(r["location_id"])
+        self.npc_name.set(r["name"])
+        self.npc_x.set(r["x"])
+        self.npc_y.set(r["y"])
+        self.npc_faction.set(r["faction"])
+        self.npc_role.set(r["role"] or "")
+        self.npc_sprite.set(r["sprite_key"])
+        self.npc_speed.set(r["speed"])
+        self.npc_gold.set(r["gold"])
+        self.npc_items.set(", ".join(json.loads(r["items_json"])))
+
+        st = json.loads(r["stats_json"])
+        self.npc_hp.set(st.get("hp", 50))
+        self.npc_str.set(st.get("str", 2))
+
+        app_val = st.get("appearance")
+        if app_val == "random":
+            self.npc_app_mode.set("random")
+        elif isinstance(app_val, dict):
+            self.npc_app_mode.set("custom")
+            self.app_body_var.set(app_val.get("body", "tunic"))
+            self.app_head_var.set(app_val.get("head", "human"))
+            self.app_hair_var.set(app_val.get("hair", "short"))
+            self.app_skin_var.set(app_val.get("skin", 0))
+            self.app_hair_col_var.set(app_val.get("hair_color", 0))
+            self.app_eye_col_var.set(app_val.get("eye_color", 0))
+            self.app_cloth_col_var.set(app_val.get("cloth_color", 0))
+        else:
+            self.npc_app_mode.set("sprite")
+
+        dlg = json.loads(r["dialogue_json"]) if r["dialogue_json"] else {}
+        self.npc_greet.set(dlg.get("greeting", ""))
+        teach = dlg.get("teach_profession", {})
+        self.npc_teach.set(teach.get("id", "") if isinstance(teach, dict) else "")
+        self.update_npc_preview()
+
+    def save_npc(self):
+        nid = self.npc_id.get().strip()
+        if not nid:
+            return
+        cur = self.db.conn.cursor()
+        cur.execute("SELECT dialogue_json, is_container FROM npc_templates WHERE id = ?", (nid,))
+        old = cur.fetchone()
+
+        dlg = json.loads(old["dialogue_json"]) if (old and old["dialogue_json"]) else {}
+        if self.npc_greet.get().strip():
+            dlg["greeting"] = self.npc_greet.get().strip()
+        teach_id = self.npc_teach.get().strip()
+        if teach_id:
+            dlg["teach_profession"] = {"id": teach_id, "cost": 40, "text": "Я научил тебя основам этого ремесла! Нажми [P], чтобы открыть верстак."}
+        elif "teach_profession" in dlg:
+            del dlg["teach_profession"]
+
+        st = {"hp": self.npc_hp.get(), "mp": 20, "str": self.npc_str.get(), "end": 1}
+        mode = self.npc_app_mode.get()
+        if mode == "random":
+            st["appearance"] = "random"
+        elif mode == "custom":
+            st["appearance"] = self.get_current_npc_app_dict()
+
+        items_list = [i.strip() for i in self.npc_items.get().split(",") if i.strip()]
+        is_cont = old["is_container"] if old else (1 if not self.npc_role.get() else 0)
+
+        cur.execute("INSERT OR REPLACE INTO npc_templates VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    (nid, self.npc_loc.get().strip(), self.npc_name.get().strip(), self.npc_x.get(), self.npc_y.get(),
+                     "[210, 175, 65]", self.npc_sprite.get().strip() or "npc", self.npc_faction.get(), is_cont,
+                     self.npc_role.get() or None, self.npc_speed.get(), 105, 16, self.npc_gold.get(),
+                     json.dumps(st), json.dumps(items_list), json.dumps(dlg, ensure_ascii=False) if dlg else None))
+        self.db.conn.commit()
+        self.refresh_npcs_table()
+        self.set_status(f"НПС '{self.npc_name.get()}' сохранен в БД!")
+
+    def delete_npc(self):
+        nid = self.npc_id.get().strip()
+        if nid:
+            self.db.conn.execute("DELETE FROM npc_templates WHERE id = ?", (nid,))
+            self.db.conn.commit()
+            self.refresh_npcs_table()
 
 if __name__ == "__main__":
     root = tk.Tk()

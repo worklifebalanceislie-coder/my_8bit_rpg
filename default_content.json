@@ -456,7 +456,7 @@
       "skill_id": null,
       "sprite_key": null
     },
-        {
+    {
       "id": "iron_ore",
       "name": "Железная руда",
       "item_type": "misc",
@@ -496,6 +496,17 @@
       "value": 10,
       "stats_bonus": "{}",
       "description": "Выделанная шкура для брони и сумок.",
+      "combat_style": "melee",
+      "skill_id": null,
+      "sprite_key": null
+    },
+    {
+      "id": "scroll_mind_expand",
+      "name": "Свиток расширения разума",
+      "item_type": "consumable",
+      "value": 120,
+      "stats_bonus": "{\"expand_skill_slots\": 1}",
+      "description": "Навсегда добавляет +1 слот на панель активных навыков (макс. 6).",
       "combat_style": "melee",
       "skill_id": null,
       "sprite_key": null
@@ -772,7 +783,6 @@
       "stats_json": "{\"hp\": 50, \"mp\": 10, \"str\": 2, \"end\": 0}",
       "items_json": "[\"book_whirlwind\", \"book_ice\", \"book_heal\", \"book_blade\", \"fire_staff\", \"hunting_bow\", \"iron_sword\", \"small_bag\", \"potion\", \"mana_potion\", \"speed_potion\", \"shield_potion\", \"antidote\"]",
       "dialogue_json": "{\"greeting\": \"Лучшие товары во всей округе! Взглянешь на прилавок?\", \"rumor\": \"С монстров у озера падают эссенции редких умений.\", \"teach_profession\": {\"id\": \"merchant\", \"cost\": 40, \"text\": \"Секрет торговли прост: покупай дешевле, продавай дороже! Теперь ты знаешь толк в ценах.\"}}"
-
     },
     {
       "id": "free_merchant",
@@ -870,19 +880,153 @@
       "dialogue_json": null
     }
   ],
+  "monster_archetypes": [
+    {
+      "id": "goblin",
+      "name_ru": "Гоблин",
+      "base_hp": 30,
+      "base_atk": 3,
+      "speed": 45,
+      "faction": "monster",
+      "possible_skills": "[\"volley\", \"whirlwind\", \"passive_blade\"]"
+    },
+    {
+      "id": "skeleton",
+      "name_ru": "Скелет",
+      "base_hp": 35,
+      "base_atk": 4,
+      "speed": 42,
+      "faction": "undead",
+      "possible_skills": "[\"ice_bolt\", \"heal_spell\", \"passive_mana\", \"passive_blade\"]"
+    },
+    {
+      "id": "slime",
+      "name_ru": "Слизень",
+      "base_hp": 42,
+      "base_atk": 2,
+      "speed": 35,
+      "faction": "monster",
+      "possible_skills": "[\"passive_skin\", \"passive_mana\", \"heal_spell\"]"
+    }
+  ],
+  "monster_parts": [
+    {
+      "id": "body_goblin",
+      "part_type": "body",
+      "archetype": "goblin",
+      "art_matrix": "[\"................\", \"................\", \"................\", \"................\", \"................\", \".....KKKKKK.....\", \"....KMMMMMMK....\", \"...KmMMMMMMmK...\", \"..KMKMMMMMMKMK..\", \"..KK.LLLLLL.KK..\", \"....KLLLLLLK....\", \"....KLL..LLK....\", \"....Kmm..mmK....\", \"...Kmmm..mmmK...\", \"...KKKK..KKKK...\", \"................\"]"
+    },
+    {
+      "id": "head_goblin_hood",
+      "part_type": "head",
+      "archetype": "goblin",
+      "art_matrix": "[\".....KKKKKK.....\", \"....KMMMMMMK....\", \"..KKKMMMMMMKKK..\", \".KmmMMEMMEMMmmK.\", \"..KKKMMMMMMKKK..\", \"....KmMMMMmK....\", \".....KKKKKK.....\", \"................\", \"................\", \"................\", \"................\", \"................\", \"................\", \"................\", \"................\", \"................\"]"
+    },
+    {
+      "id": "head_goblin_mohawk",
+      "part_type": "head",
+      "archetype": "goblin",
+      "art_matrix": "[\"......KKKK......\", \".....KRRRRK.....\", \"....KMMMMMMK....\", \"..KKKMMMMMMKKK..\", \".KmmMMEMMEMMmmK.\", \"....KmMMMMmK....\", \".....KKKKKK.....\", \"................\", \"................\", \"................\", \"................\", \"................\", \"................\", \"................\", \"................\", \"................\"]"
+    },
+    {
+      "id": "body_ribcage",
+      "part_type": "body",
+      "archetype": "skeleton",
+      "art_matrix": "[\"................\", \"................\", \"................\", \"................\", \"................\", \".....KKKKKK.....\", \"....KMMMMMMK....\", \"...KMKmMMmKMK...\", \"..KMK.MMMM.KMK..\", \"..KK.KmMMmK.KK..\", \"....KMMMMMMK....\", \"....KMM..MMK....\", \"....Kmm..mmK....\", \"...KMMM..MMMK...\", \"...KKKK..KKKK...\", \"................\"]"
+    },
+    {
+      "id": "head_skull",
+      "part_type": "head",
+      "archetype": "skeleton",
+      "art_matrix": "[\".....KKKKKK.....\", \"....KMMMMMMK....\", \"...KMMMMMMMMK...\", \"...KMMEmmEMMK...\", \"....KMMMMMMK....\", \"....KMmMmMmK....\", \".....KKKKKK.....\", \"................\", \"................\", \"................\", \"................\", \"................\", \"................\", \"................\", \"................\", \"................\"]"
+    },
+    {
+      "id": "head_skull_horns",
+      "part_type": "head",
+      "archetype": "skeleton",
+      "art_matrix": "[\"..KK........KK..\", \".KYYKKKKKKKKYYK.\", \"..KYMMMMMMMMYK..\", \"...KMMEmmEMMK...\", \"....KMMMMMMK....\", \"....KMmMmMmK....\", \".....KKKKKK.....\", \"................\", \"................\", \"................\", \"................\", \"................\", \"................\", \"................\", \"................\", \"................\"]"
+    },
+    {
+      "id": "body_slime",
+      "part_type": "body",
+      "archetype": "slime",
+      "art_matrix": "[\"................\", \"................\", \"................\", \"......KKKK......\", \"....KKMMMMKK....\", \"...KMMMMMMMMK...\", \"..KMMMMMMMMMMK..\", \".KMMEMMMMMMEMMK.\", \".KMMMMMMMMMMMMK.\", \"KMMMMMMMMMMMMMMK\", \"KmMMMMMMMMMMMMmK\", \"KmmMMMMMMMMMMmmK\", \".KmmmmmmmmmmmmK.\", \"..KKKKKKKKKKKK..\", \"................\", \"................\"]"
+    }
+  ],
   "professions_catalog": [
-    {"id": "blacksmith", "name": "Кузнец", "desc": "Ковка железного оружия и прочной брони.", "bonus_type": "craft"},
-    {"id": "carpenter", "name": "Плотник", "desc": "Изготовление луков, посохов и походных сумок.", "bonus_type": "craft"},
-    {"id": "alchemist", "name": "Алхимик", "desc": "Варка целебных, магических и усиливающих зелий.", "bonus_type": "craft"},
-    {"id": "merchant", "name": "Торговец", "desc": "Выгодные цены при покупке (-15%) и продаже (+20%).", "bonus_type": "trade"}
+    {
+      "id": "blacksmith",
+      "name": "Кузнец",
+      "desc": "Ковка железного оружия и прочной брони.",
+      "bonus_type": "craft"
+    },
+    {
+      "id": "carpenter",
+      "name": "Плотник",
+      "desc": "Изготовление луков, посохов и походных сумок.",
+      "bonus_type": "craft"
+    },
+    {
+      "id": "alchemist",
+      "name": "Алхимик",
+      "desc": "Варка целебных, магических и усиливающих зелий.",
+      "bonus_type": "craft"
+    },
+    {
+      "id": "merchant",
+      "name": "Торговец",
+      "desc": "Выгодные цены при покупке (-15%) и продаже (+20%).",
+      "bonus_type": "trade"
+    }
   ],
   "recipes_catalog": [
-    {"id": "rec_iron_sword", "prof_id": "blacksmith", "result_item_id": "iron_sword", "req_level": 1, "materials_json": "{\"iron_ore\": 2, \"wood_log\": 1}", "xp_gain": 35},
-    {"id": "rec_chainmail", "prof_id": "blacksmith", "result_item_id": "chainmail", "req_level": 1, "materials_json": "{\"iron_ore\": 3, \"leather_piece\": 1}", "xp_gain": 40},
-    {"id": "rec_hunting_bow", "prof_id": "carpenter", "result_item_id": "hunting_bow", "req_level": 1, "materials_json": "{\"wood_log\": 2, \"leather_piece\": 1}", "xp_gain": 30},
-    {"id": "rec_small_bag", "prof_id": "carpenter", "result_item_id": "small_bag", "req_level": 1, "materials_json": "{\"leather_piece\": 2}", "xp_gain": 25},
-    {"id": "rec_potion", "prof_id": "alchemist", "result_item_id": "potion", "req_level": 1, "materials_json": "{\"herb_leaf\": 2}", "xp_gain": 20},
-    {"id": "rec_speed_potion", "prof_id": "alchemist", "result_item_id": "speed_potion", "req_level": 1, "materials_json": "{\"herb_leaf\": 2, \"wood_log\": 1}", "xp_gain": 25}
+    {
+      "id": "rec_iron_sword",
+      "prof_id": "blacksmith",
+      "result_item_id": "iron_sword",
+      "req_level": 1,
+      "materials_json": "{\"iron_ore\": 2, \"wood_log\": 1}",
+      "xp_gain": 35
+    },
+    {
+      "id": "rec_chainmail",
+      "prof_id": "blacksmith",
+      "result_item_id": "chainmail",
+      "req_level": 1,
+      "materials_json": "{\"iron_ore\": 3, \"leather_piece\": 1}",
+      "xp_gain": 40
+    },
+    {
+      "id": "rec_hunting_bow",
+      "prof_id": "carpenter",
+      "result_item_id": "hunting_bow",
+      "req_level": 1,
+      "materials_json": "{\"wood_log\": 2, \"leather_piece\": 1}",
+      "xp_gain": 30
+    },
+    {
+      "id": "rec_small_bag",
+      "prof_id": "carpenter",
+      "result_item_id": "small_bag",
+      "req_level": 1,
+      "materials_json": "{\"leather_piece\": 2}",
+      "xp_gain": 25
+    },
+    {
+      "id": "rec_potion",
+      "prof_id": "alchemist",
+      "result_item_id": "potion",
+      "req_level": 1,
+      "materials_json": "{\"herb_leaf\": 2}",
+      "xp_gain": 20
+    },
+    {
+      "id": "rec_speed_potion",
+      "prof_id": "alchemist",
+      "result_item_id": "speed_potion",
+      "req_level": 1,
+      "materials_json": "{\"herb_leaf\": 2, \"wood_log\": 1}",
+      "xp_gain": 25
+    }
   ]
-
 }
