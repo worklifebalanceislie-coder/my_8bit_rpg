@@ -1,26 +1,11 @@
 import tkinter as tk
-from tkinter import ttk, filedialog, messagebox
+from tkinter import ttk, filedialog, messagebox, colorchooser
 import json
 import os
 import pygame
 from database import DatabaseManager
-from sprites import PALETTE
+from sprites import resolve_color
 
-VALID_PALETTE = {k: v for k, v in PALETTE.items() if v is not None}
-VALID_PALETTE["M"] = (100, 190, 90)   # Основной цвет тела монстра (перекрашивается в игре)
-VALID_PALETTE["m"] = (60, 130, 55)    # Тень тела монстра (перекрашивается в игре)
-VALID_PALETTE["E"] = (240, 60, 60)    # Глаза монстра (перекрашиваются в игре)
-
-
-def closest_palette_char(r, g, b, a=255):
-    if a < 128:
-        return "."
-    best_k, best_dist = ".", 999999
-    for k, (pr, pg, pb) in VALID_PALETTE.items():
-        dist = (r - pr) ** 2 + (g - pg) ** 2 + (b - pb) ** 2
-        if dist < best_dist:
-            best_dist, best_k = dist, k
-    return best_k
 
 def rgb_to_hex(rgb):
     r, g, b = rgb
@@ -35,8 +20,6 @@ class RPGContentStudio:
 
         pygame.init()
         self.db = DatabaseManager("rpg.db")
-        self.db.sync_all_catalogs()
-        from sprites import load_sprites
         self.db.sync_all_catalogs()
 
         self.build_top_bar()
@@ -68,7 +51,7 @@ class RPGContentStudio:
         ttk.Button(bar, text="Импорт из JSON...", command=self.import_json).pack(side=tk.RIGHT, padx=4)
 
     def export_json(self):
-        path = filedialog.asksaveasfilename(defaultextension=".json", filetypes=[("JSON файлы", "*.json")], initialfile="rpg_content.json")
+        path = filedialog.asksaveasfilename(defaultextension=".json", filetypes=[("JSON файлы", "*.json")], initialfile="default_content.json")
         if not path:
             return
         cur = self.db.conn.cursor()
@@ -77,7 +60,6 @@ class RPGContentStudio:
             "races_catalog", "classes_catalog", "factions_catalog", "npc_templates",
             "monster_archetypes", "monster_parts", "professions_catalog", "recipes_catalog"
         ]
-
         dump = {}
         for t in tables:
             cur.execute(f"SELECT * FROM {t}")
@@ -98,7 +80,8 @@ class RPGContentStudio:
             for table, rows in dump.items():
                 if not rows:
                     continue
-                first_row, *_ = rows; cols = list(first_row.keys())
+                first_row, *_ = rows
+                cols = list(first_row.keys())
                 placeholders = ", ".join(["?"] * len(cols))
                 col_names = ", ".join(cols)
                 for row in rows:
@@ -120,19 +103,14 @@ class RPGContentStudio:
         self.refresh_monsters_tables()
         self.refresh_professions_tables()
         self.refresh_npcs_table()
-    
     def build_sprites_tab(self):
         tab = ttk.Frame(self.notebook, padding=10)
         self.notebook.add(tab, text="1. Спрайты (16x16)")
 
-        left = ttk.Frame(tab)
-        left.pack(side=tk.LEFT, fill=tk.Y, padx=10)
-        ttk.Label(left, text="Холст 16x16 (ЛКМ — рисовать, ПКМ — стереть)", font=("Segoe UI", 10, "bold")).pack(pady=4)
-
         self.cell_size = 26
         left = ttk.Frame(tab)
         left.pack(side=tk.LEFT, fill=tk.Y, padx=10)
-        ttk.Label(left, text="Холст 16x16 (ЛКМ — рисовать, ПКМ — стереть)", font=("Segoe UI", 10, "bold")).pack(pady=4)
+        ttk.Label(left, text="Холст 16x16 (ЛКМ — рисовать, ПКМ — стереть, СКМ — пипетка)", font=("Segoe UI", 9, "bold")).pack(pady=4)
 
         guide_bar = ttk.Frame(left)
         guide_bar.pack(fill=tk.X, pady=(0, 4))
@@ -158,9 +136,10 @@ class RPGContentStudio:
         self.canvas.bind("<B1-Motion>", lambda e: self.paint_cell(e, erase=False))
         self.canvas.bind("<Button-3>", lambda e: self.paint_cell(e, erase=True))
         self.canvas.bind("<B3-Motion>", lambda e: self.paint_cell(e, erase=True))
+        self.canvas.bind("<Button-2>", self.on_canvas_pick)
 
         self.grid_data = [["." for _ in range(16)] for _ in range(16)]
-        self.selected_char = "R"
+        self.current_color = "#14141c"
 
         btn_row = ttk.Frame(left)
         btn_row.pack(fill=tk.X, pady=8)
@@ -168,73 +147,117 @@ class RPGContentStudio:
         ttk.Button(btn_row, text="Загрузить PNG (можно несколько)...", command=self.import_png_sprites).pack(side=tk.LEFT, padx=4)
 
         mid = ttk.Frame(tab)
-        mid.pack(side=tk.LEFT, fill=tk.Y, padx=15)
-        ttk.Label(mid, text="Палитра цветов:", font=("Segoe UI", 10, "bold")).pack(anchor=tk.W, pady=4)
+        mid.pack(side=tk.LEFT, fill=tk.Y, padx=12)
 
-        pal_frame = ttk.Frame(mid)
-        pal_frame.pack(anchor=tk.W)
-        for idx, (ch, rgb) in enumerate(VALID_PALETTE.items()):
-            b = tk.Button(pal_frame, bg=rgb_to_hex(rgb), width=3, height=1, relief=tk.RAISED,
-                          command=lambda c=ch: self.select_palette_color(c))
-            b.grid(row=idx // 6, column=idx % 6, padx=2, pady=2)
+        pal_frame = ttk.LabelFrame(mid, text="Цвет кисти (Любой RGB / HEX)", padding=8)
+        pal_frame.pack(fill=tk.X, pady=4)
 
-        self.cur_color_lbl = ttk.Label(mid, text=f"Выбран цвет: {self.selected_char}", font=("Segoe UI", 9, "bold"))
-        self.cur_color_lbl.pack(anchor=tk.W, pady=6)
+        top_pal = ttk.Frame(pal_frame)
+        top_pal.pack(fill=tk.X, pady=(0, 6))
 
-        ttk.Label(mid, text="Предпросмотр (4x):", font=("Segoe UI", 10, "bold")).pack(anchor=tk.W, pady=(10, 4))
-        self.preview_canvas = tk.Canvas(mid, width=64, height=64, bg="#2b303e", highlightthickness=1)
-        self.preview_canvas.pack(anchor=tk.W)
+        self.cur_color_lbl = tk.Label(top_pal, text=" #14141c ", bg="#14141c", fg="#ffffff", font=("Consolas", 9, "bold"), relief=tk.SUNKEN, width=13)
+        self.cur_color_lbl.pack(side=tk.LEFT, padx=(0, 6))
 
-        ttk.Label(mid, text="Ключ спрайта в БД:", font=("Segoe UI", 10)).pack(anchor=tk.W, pady=(14, 2))
-        self.sprite_key_var = tk.StringVar(value="custom_sprite")
-        ttk.Entry(mid, textvariable=self.sprite_key_var, width=28).pack(anchor=tk.W, pady=2)
+        ttk.Button(top_pal, text="Выбрать любой цвет...", command=self.pick_any_color).pack(side=tk.LEFT, padx=3)
+        ttk.Button(top_pal, text="Ластик", command=lambda: self.set_brush_token(".")).pack(side=tk.LEFT, padx=3)
 
-        ttk.Button(mid, text="Сохранить спрайт в БД", command=self.save_sprite).pack(anchor=tk.W, pady=8, fill=tk.X)
-        ttk.Button(mid, text="Удалить выбранный из БД", command=self.delete_sprite).pack(anchor=tk.W, pady=2, fill=tk.X)
+        self.quick_colors = [
+            "#14141c", "#ffffff", "#ebba8c", "#c38c64", "#8c5a2d", "#5f3c1e",
+            "#c83737", "#8c1e1e", "#f0c841", "#f5912d", "#419b50", "#5aaf41",
+            "#4bd2c3", "#417dc8", "#285091", "#964bc3", "#afb9c8", "#737d8c"
+        ]
+        swatches_frame = ttk.Frame(pal_frame)
+        swatches_frame.pack(fill=tk.X)
+        for idx, hx in enumerate(self.quick_colors):
+            btn = tk.Button(swatches_frame, bg=hx, width=2, height=1, command=lambda c=hx: self.set_brush_token(c))
+            btn.grid(row=idx // 9, column=idx % 9, padx=1, pady=1)
 
-        right = ttk.Frame(tab)
-        right.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=10)
-        ttk.Label(right, text="Спрайты в базе данных:", font=("Segoe UI", 10, "bold")).pack(anchor=tk.W)
+        prev_frame = ttk.LabelFrame(mid, text="Предпросмотр (4x)", padding=8)
+        prev_frame.pack(fill=tk.X, pady=8)
+        self.preview_canvas = tk.Canvas(prev_frame, width=64, height=64, bg="#232734", highlightthickness=1)
+        self.preview_canvas.pack()
+
+        save_frame = ttk.LabelFrame(mid, text="Сохранение в БД", padding=8)
+        save_frame.pack(fill=tk.X, pady=4)
+        ttk.Label(save_frame, text="Ключ спрайта (sprite_key):").pack(anchor=tk.W)
+        self.sprite_key_var = tk.StringVar()
+        ttk.Entry(save_frame, textvariable=self.sprite_key_var, width=28).pack(fill=tk.X, pady=4)
+
+        s_btns = ttk.Frame(save_frame)
+        s_btns.pack(fill=tk.X, pady=4)
+        ttk.Button(s_btns, text="Сохранить спрайт", command=self.save_sprite).pack(side=tk.LEFT, padx=2)
+        ttk.Button(s_btns, text="Удалить", command=self.delete_sprite).pack(side=tk.LEFT, padx=2)
+
+        right = ttk.LabelFrame(tab, text="Спрайты и детали в БД", padding=8)
+        right.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
         self.sprite_search_var = tk.StringVar()
         self.sprite_search_var.trace_add("write", lambda *_: self.refresh_sprite_list())
-        ttk.Entry(right, textvariable=self.sprite_search_var).pack(fill=tk.X, pady=4)
+        ttk.Entry(right, textvariable=self.sprite_search_var).pack(fill=tk.X, pady=(0, 6))
 
         self.sprite_listbox = tk.Listbox(right, font=("Consolas", 10))
         self.sprite_listbox.pack(fill=tk.BOTH, expand=True)
         self.sprite_listbox.bind("<<ListboxSelect>>", self.on_sprite_select)
 
-        self.redraw_sprite_canvas()
         self.refresh_sprite_list()
+        self.redraw_sprite_canvas()
 
-    def select_palette_color(self, ch):
-        self.selected_char = ch
-        self.cur_color_lbl.config(text=f"Выбран цвет: {ch}")
+    def set_brush_token(self, token):
+        self.current_color = token
+        rgb = resolve_color(token)
+        if rgb:
+            hx = rgb_to_hex(rgb)
+            fg = "#ffffff" if sum(rgb) < 380 else "#000000"
+            self.cur_color_lbl.config(bg=hx, fg=fg, text=f" {hx} ")
+        else:
+            self.cur_color_lbl.config(bg="#232734", fg="#ffffff", text=" ПРОЗРАЧНЫЙ ")
+
+    def pick_any_color(self):
+        init_rgb = resolve_color(self.current_color) or (255, 255, 255)
+        res = colorchooser.askcolor(color=rgb_to_hex(init_rgb), title="Выберите любой цвет пиксела")
+        if res and res[1]:
+            self.set_brush_token(res[1].lower())
+
+    def on_canvas_pick(self, event):
+        c = event.x // self.cell_size
+        r = event.y // self.cell_size
+        if 0 <= r < 16 and 0 <= c < 16:
+            self.set_brush_token(self.grid_data[r][c])
+            self.set_status(f"Пипетка: взят цвет {self.grid_data[r][c]}")
 
     def paint_cell(self, event, erase=False):
         c = event.x // self.cell_size
         r = event.y // self.cell_size
         if 0 <= r < 16 and 0 <= c < 16:
-            self.grid_data[r][c] = "." if erase else self.selected_char
+            self.grid_data[r][c] = "." if erase else self.current_color
             self.redraw_sprite_canvas()
 
     def clear_sprite_canvas(self):
         self.grid_data = [["." for _ in range(16)] for _ in range(16)]
         self.redraw_sprite_canvas()
 
-    def redraw_sprite_canvas(self):
-        self.canvas.delete("all")
-        self.preview_canvas.delete("all")
-        for r in range(16):
-            for c in range(16):
-                ch = self.grid_data[r][c]
-                rgb = PALETTE.get(ch)
-                fill = rgb_to_hex(rgb) if rgb else ("#232734" if (r + c) % 2 == 0 else "#2c3140")
-                x1, y1 = c * self.cell_size, r * self.cell_size
-                self.canvas.create_rectangle(x1, y1, x1 + self.cell_size, y1 + self.cell_size, fill=fill, outline="#3c4254")
-                if rgb:
-                    self.preview_canvas.create_rectangle(c * 4, r * 4, c * 4 + 4, r * 4 + 4, fill=fill, outline="")
-        self.draw_guide_overlay()
+    def import_png_sprites(self):
+        paths = filedialog.askopenfilenames(filetypes=[("Изображения", "*.png;*.jpg;*.bmp")])
+        if not paths:
+            return
+        cur = self.db.conn.cursor()
+        for path in paths:
+            surf = pygame.transform.scale(pygame.image.load(path), (16, 16))
+            mat = []
+            for r in range(16):
+                row_tokens = []
+                for c in range(16):
+                    col = surf.get_at((c, r))
+                    row_tokens.append("." if col.a < 128 else f"#{col.r:02x}{col.g:02x}{col.b:02x}")
+                mat.append(row_tokens)
+            key = os.path.splitext(os.path.basename(path))[0].lower()
+            cur.execute("INSERT OR REPLACE INTO sprites_catalog VALUES (?, ?)", (key, json.dumps(mat)))
+            self.grid_data = mat
+            self.sprite_key_var.set(key)
+        self.db.conn.commit()
+        self.refresh_sprite_list()
+        self.redraw_sprite_canvas()
+        self.set_status(f"Загружено PNG: {len(paths)} шт. со 100% оригинальными цветами!")
 
     def draw_guide_overlay(self):
         mode = getattr(self, "guide_var", None)
@@ -253,7 +276,6 @@ class RPGContentStudio:
             box(3, 7, 12, 11, "#a6e22e", "Торс/Руки")
             box(4, 12, 11, 15, "#fd971f", "Ноги")
         elif g.startswith("Оружие"):
-            # Диагональная ось клинка/посоха
             self.canvas.create_line(7 * cs + cs // 2, 11 * cs + cs // 2, 15 * cs + cs // 2, 2 * cs + cs // 2, fill="#f92672", width=2, dash=(5, 3))
             box(7, 9, 10, 11, "#e6db74", "Рукоять")
             box(10, 2, 15, 8, "#66d9ef", "Лезвие")
@@ -267,46 +289,29 @@ class RPGContentStudio:
             self.canvas.create_line(0, 6 * cs, 16 * cs, 6 * cs, fill="#66d9ef", width=2, dash=(4, 2))
             box(3, 6, 12, 14, "#a6e22e", "Тело и ноги")
 
-    def import_png_sprites(self):
-        paths = filedialog.askopenfilenames(title="Выберите изображения (PNG/JPG/BMP)", filetypes=[("Изображения", "*.png *.jpg *.jpeg *.bmp")])
-        if not paths:
-            return
-        cur = self.db.conn.cursor()
-        count = 0
-        for p in paths:
-            try:
-                surf = pygame.image.load(p)
-                scaled = pygame.transform.scale(surf, (16, 16))
-                matrix = []
-                for y in range(16):
-                    row_chars = []
-                    for x in range(16):
-                        r, g, b, a = scaled.get_at((x, y))
-                        row_chars.append(closest_palette_char(r, g, b, a))
-                    matrix.append("".join(row_chars))
-                base_name, _ = os.path.splitext(os.path.basename(p))
-                key = base_name.lower().replace(" ", "_")
-                cur.execute("INSERT OR REPLACE INTO sprites_catalog VALUES (?, ?)", (key, json.dumps(matrix)))
-                count += 1
-            except Exception as e:
-                messagebox.showwarning("Ошибка файла", f"Не удалось загрузить {p}: {e}")
-        self.db.conn.commit()
-        self.refresh_sprite_list()
-        self.set_status(f"Импортировано спрайтов из файлов: {count}")
+    def redraw_sprite_canvas(self):
+        self.canvas.delete("all")
+        self.preview_canvas.delete("all")
+        for r in range(16):
+            for c in range(16):
+                token = self.grid_data[r][c]
+                rgb = resolve_color(token)
+                fill = rgb_to_hex(rgb) if rgb else ("#232734" if (r + c) % 2 == 0 else "#2c3140")
+                x1, y1 = c * self.cell_size, r * self.cell_size
+                self.canvas.create_rectangle(x1, y1, x1 + self.cell_size, y1 + self.cell_size, fill=fill, outline="#3c4254")
+                if rgb:
+                    self.preview_canvas.create_rectangle(c * 4, r * 4, c * 4 + 4, r * 4 + 4, fill=fill, outline="")
+        self.draw_guide_overlay()
 
     def refresh_sprite_list(self):
         query = self.sprite_search_var.get().lower()
         self.sprite_listbox.delete(0, tk.END)
         cur = self.db.conn.cursor()
-
-        # 1. Обычные спрайты и тайлы окружения (трава, вода, песок, стены, предметы)
         cur.execute("SELECT sprite_key FROM sprites_catalog ORDER BY sprite_key")
         for r in cur.fetchall():
             k = r["sprite_key"]
             if query in k.lower():
                 self.sprite_listbox.insert(tk.END, k)
-
-        # 2. Детали генератора монстров (головы и туловища)
         cur.execute("SELECT id FROM monster_parts ORDER BY id")
         for r in cur.fetchall():
             label = f"[МОНСТР] {r['id']}"
@@ -320,39 +325,30 @@ class RPGContentStudio:
         idx, *_ = sel
         raw_label = self.sprite_listbox.get(idx)
         cur = self.db.conn.cursor()
-
         if raw_label.startswith("[МОНСТР] "):
             part_id = raw_label.replace("[МОНСТР] ", "")
             cur.execute("SELECT art_matrix FROM monster_parts WHERE id = ?", (part_id,))
-            row = cur.fetchone()
-            if row:
-                self.sprite_key_var.set(raw_label)
-                mat = json.loads(row["art_matrix"])
-                self.grid_data = [list(line.ljust(16, ".")) for line in mat[:16]]
-                self.redraw_sprite_canvas()
         else:
             cur.execute("SELECT art_matrix FROM sprites_catalog WHERE sprite_key = ?", (raw_label,))
-            row = cur.fetchone()
-            if row:
-                self.sprite_key_var.set(raw_label)
-                mat = json.loads(row["art_matrix"])
-                self.grid_data = [list(line.ljust(16, ".")) for line in mat[:16]]
-                self.redraw_sprite_canvas()
+        row = cur.fetchone()
+        if row:
+            self.sprite_key_var.set(raw_label)
+            mat = json.loads(row["art_matrix"])
+            self.grid_data = [(list(line.ljust(16, ".")) if isinstance(line, str) else line[:16]) for line in mat[:16]]
+            self.redraw_sprite_canvas()
 
     def save_sprite(self):
         key = self.sprite_key_var.get().strip()
         if not key:
             return
-        matrix = ["".join(r) for r in self.grid_data]
         cur = self.db.conn.cursor()
-
         if key.startswith("[МОНСТР] "):
             part_id = key.replace("[МОНСТР] ", "")
-            cur.execute("UPDATE monster_parts SET art_matrix = ? WHERE id = ?", (json.dumps(matrix), part_id))
+            cur.execute("UPDATE monster_parts SET art_matrix = ? WHERE id = ?", (json.dumps(self.grid_data), part_id))
             self.db.conn.commit()
             self.set_status(f"Деталь монстра '{part_id}' обновлена в БД!")
         else:
-            cur.execute("INSERT OR REPLACE INTO sprites_catalog VALUES (?, ?)", (key, json.dumps(matrix)))
+            cur.execute("INSERT OR REPLACE INTO sprites_catalog VALUES (?, ?)", (key, json.dumps(self.grid_data)))
             self.db.conn.commit()
             self.set_status(f"Спрайт '{key}' сохранен в БД.")
         self.refresh_sprite_list()
@@ -371,7 +367,6 @@ class RPGContentStudio:
         self.db.conn.commit()
         self.refresh_sprite_list()
         self.set_status(f"Запись '{key}' удалена из БД.")
-
     def build_items_tab(self):
         tab = ttk.Frame(self.notebook, padding=10)
         self.notebook.add(tab, text="2. Предметы")
@@ -455,7 +450,6 @@ class RPGContentStudio:
             self.items_tree.column(c, width=w)
         self.items_tree.pack(fill=tk.BOTH, expand=True)
         self.items_tree.bind("<<TreeviewSelect>>", self.on_item_select)
-
         self.refresh_items_table()
 
     def get_skill_ids(self):
@@ -556,7 +550,7 @@ class RPGContentStudio:
         self.db.conn.commit()
         self.refresh_items_table()
         self.set_status(f"Предмет '{iid}' удален.")
-    
+
     def build_skills_tab(self):
         tab = ttk.Frame(self.notebook, padding=10)
         self.notebook.add(tab, text="3. Навыки")
@@ -569,6 +563,7 @@ class RPGContentStudio:
         self.sk_kind = tk.StringVar(value="active")
         self.sk_mana = tk.IntVar(value=10)
         self.sk_cd = tk.DoubleVar(value=3.0)
+        self.sk_sprite = tk.StringVar(value="")
         self.sk_desc = tk.StringVar()
 
         rows = [
@@ -577,6 +572,7 @@ class RPGContentStudio:
             ("Тип:", ttk.Combobox(form, textvariable=self.sk_kind, state="readonly", width=25, values=["active", "passive"])),
             ("Расход MP:", ttk.Spinbox(form, from_=0, to=500, textvariable=self.sk_mana, width=10)),
             ("Откат (сек):", ttk.Spinbox(form, from_=0.0, to=60.0, increment=0.5, textvariable=self.sk_cd, width=10)),
+            ("Иконка (спрайт):", ttk.Combobox(form, textvariable=self.sk_sprite, width=25, values=self.get_sprite_keys())),
             ("Описание:", ttk.Entry(form, textvariable=self.sk_desc, width=28)),
         ]
         for idx, (lbl, w) in enumerate(rows):
@@ -584,7 +580,7 @@ class RPGContentStudio:
             w.grid(row=idx, column=1, sticky=tk.W, pady=4, padx=5)
 
         btns = ttk.Frame(form)
-        btns.grid(row=6, column=0, columnspan=2, pady=12)
+        btns.grid(row=7, column=0, columnspan=2, pady=12)
         ttk.Button(btns, text="Сохранить", command=self.save_skill).pack(side=tk.LEFT, padx=4)
         ttk.Button(btns, text="Удалить", command=self.delete_skill).pack(side=tk.LEFT, padx=4)
 
@@ -608,21 +604,26 @@ class RPGContentStudio:
         sel = self.skills_tree.selection()
         if not sel:
             return
-        sid, sname, skind, smana, scd, sdesc = self.skills_tree.item(sel)["values"]
-        self.sk_id.set(sid)
-        self.sk_name.set(sname)
-        self.sk_kind.set(skind)
-        self.sk_mana.set(smana)
-        self.sk_cd.set(scd)
-        self.sk_desc.set(sdesc)
+        sid, *_ = self.skills_tree.item(sel)["values"]
+        cur = self.db.conn.cursor()
+        cur.execute("SELECT * FROM skills_catalog WHERE id = ?", (sid,))
+        r = cur.fetchone()
+        if r:
+            self.sk_id.set(r["id"])
+            self.sk_name.set(r["name"])
+            self.sk_kind.set(r["kind"])
+            self.sk_mana.set(r["mana_cost"])
+            self.sk_cd.set(r["cooldown"])
+            self.sk_sprite.set(r["sprite_key"] or "")
+            self.sk_desc.set(r["desc"])
 
     def save_skill(self):
         if not self.sk_id.get().strip():
             return
         cur = self.db.conn.cursor()
-        cur.execute("INSERT OR REPLACE INTO skills_catalog VALUES (?, ?, ?, ?, ?, ?)",
+        cur.execute("INSERT OR REPLACE INTO skills_catalog VALUES (?, ?, ?, ?, ?, ?, ?)",
                     (self.sk_id.get().strip(), self.sk_name.get().strip(), self.sk_kind.get(),
-                     self.sk_mana.get(), self.sk_cd.get(), self.sk_desc.get()))
+                     self.sk_mana.get(), self.sk_cd.get(), self.sk_desc.get(), self.sk_sprite.get().strip() or None))
         self.db.conn.commit()
         self.refresh_skills_table()
         self.set_status("Навык сохранен в БД.")
@@ -633,7 +634,6 @@ class RPGContentStudio:
             self.db.conn.execute("DELETE FROM skills_catalog WHERE id = ?", (sid,))
             self.db.conn.commit()
             self.refresh_skills_table()
-    
     def build_races_tab(self):
         tab = ttk.Frame(self.notebook, padding=10)
         self.notebook.add(tab, text="4. Расы")
@@ -736,25 +736,12 @@ class RPGContentStudio:
         self.refresh_races_table()
         self.set_status("Раса сохранена в БД.")
 
-        rid = self.rc_id.get().strip()
-        if not rid:
-            return
-        bon = {k: v.get() for k, v in self.rc_bonuses.items()}
-        self.db.conn.execute("INSERT OR REPLACE INTO races_catalog VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                             (rid, self.rc_name.get().strip(), self.rc_faction.get(), self.rc_speed.get(),
-                              json.dumps(bon), self.rc_gold.get(), self.rc_skill.get() or None,
-                              self.rc_desc.get(), self.rc_rel.get()))
-        self.db.conn.commit()
-        self.refresh_races_table()
-        self.set_status("Раса сохранена в БД.")
-
     def delete_race(self):
         rid = self.rc_id.get().strip()
         if rid:
             self.db.conn.execute("DELETE FROM races_catalog WHERE id = ?", (rid,))
             self.db.conn.commit()
             self.refresh_races_table()
-
     def build_classes_tab(self):
         tab = ttk.Frame(self.notebook, padding=10)
         self.notebook.add(tab, text="5. Классы")
@@ -903,7 +890,7 @@ class RPGContentStudio:
         sel = self.fac_tree.selection()
         if not sel:
             return
-        fid, fname, hostile_json = self.fac_tree.item(sel[0])["values"]
+        fid, fname, hostile_json = self.fac_tree.item(sel)["values"]
         self.fac_id.set(fid)
         self.fac_name.set(fname)
         enemies = set(json.loads(hostile_json))
@@ -927,15 +914,10 @@ class RPGContentStudio:
             self.db.conn.execute("DELETE FROM factions_catalog WHERE id = ?", (fid,))
             self.db.conn.commit()
             self.refresh_factions_table()
-
-    # =========================================================================
-    # 7. ВКЛАДКА ГЕНЕРАТОРА МОНСТРОВ (АРХЕТИПЫ И ЗАПЧАСТИ)
-    # =========================================================================
     def build_monsters_tab(self):
         tab = ttk.Frame(self.notebook, padding=10)
         self.notebook.add(tab, text="7. Монстры")
 
-        # Левая половина: Архетипы монстров
         left = ttk.LabelFrame(tab, text="Архетипы монстров (Виды)", padding=10)
         left.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 8))
 
@@ -972,7 +954,6 @@ class RPGContentStudio:
         self.m_arch_tree.grid(row=8, column=0, columnspan=2, sticky=tk.NSEW, pady=6)
         self.m_arch_tree.bind("<<TreeviewSelect>>", self.on_m_arch_select)
 
-        # Правая половина: Части тела (Головы и Туловища)
         right = ttk.LabelFrame(tab, text="Части тела для сборки (Туловища и Головы)", padding=10)
         right.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(8, 0))
 
@@ -998,7 +979,7 @@ class RPGContentStudio:
         p_btns.grid(row=4, column=0, columnspan=2, pady=8)
         ttk.Button(p_btns, text="Сохранить деталь", command=self.save_monster_part).pack(side=tk.LEFT, padx=3)
         ttk.Button(p_btns, text="Удалить", command=self.delete_monster_part).pack(side=tk.LEFT, padx=3)
-        ttk.Button(p_btns, text="Рисовать на холсте ➔", command=self.edit_part_on_canvas).pack(side=tk.LEFT, padx=3)
+        ttk.Button(p_btns, text="Рисовать на холсте ->", command=self.edit_part_on_canvas).pack(side=tk.LEFT, padx=3)
 
         self.m_parts_tree = ttk.Treeview(right, columns=("id", "type", "arch"), show="headings", height=13)
         for c, t, w in [("id", "ID детали", 160), ("type", "Тип", 70), ("arch", "Архетип", 120)]:
@@ -1101,7 +1082,7 @@ class RPGContentStudio:
         if row:
             self.sprite_key_var.set(f"[МОНСТР] {pid}")
             mat = json.loads(row["art_matrix"])
-            self.grid_data = [list(line.ljust(16, ".")) for line in mat[:16]]
+            self.grid_data = [(list(line.ljust(16, ".")) if isinstance(line, str) else line[:16]) for line in mat[:16]]
             self.redraw_sprite_canvas()
             self.notebook.select(0)
             self.set_status(f"Редактирование детали '{pid}' на холсте 16x16")
@@ -1138,14 +1119,10 @@ class RPGContentStudio:
             self.refresh_monsters_tables()
             self.refresh_sprite_list()
 
-    # =========================================================================
-    # 8. ВКЛАДКА ПРОФЕССИЙ И РЕЦЕПТОВ КРАФТА
-    # =========================================================================
     def build_professions_tab(self):
         tab = ttk.Frame(self.notebook, padding=10)
         self.notebook.add(tab, text="8. Профессии и Крафт")
 
-        # Левая половина: Профессии
         left = ttk.LabelFrame(tab, text="Профессии", padding=10)
         left.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 8))
 
@@ -1176,7 +1153,6 @@ class RPGContentStudio:
         self.prof_tree.grid(row=5, column=0, columnspan=2, sticky=tk.NSEW, pady=6)
         self.prof_tree.bind("<<TreeviewSelect>>", self.on_prof_select)
 
-        # Правая половина: Рецепты крафта
         right = ttk.LabelFrame(tab, text="Рецепты создания предметов", padding=10)
         right.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(8, 0))
 
@@ -1297,17 +1273,12 @@ class RPGContentStudio:
             self.db.conn.execute("DELETE FROM recipes_catalog WHERE id = ?", (rid,))
             self.db.conn.commit()
             self.refresh_professions_tables()
-
-    # =========================================================================
-    # 9. ВКЛАДКА НПС И КОНСТРУКТОРА ВНЕШНОСТИ
-    # =========================================================================
     def build_npcs_tab(self):
         from appearance import BODY_LAYERS, HEAD_LAYERS, HAIR_LAYERS, SKIN_COLORS, HAIR_COLORS, EYE_COLORS, CLOTH_COLORS
 
         tab = ttk.Frame(self.notebook, padding=10)
         self.notebook.add(tab, text="9. НПС и Внешность")
 
-        # Левая колонка: Основные параметры НПС
         left = ttk.LabelFrame(tab, text="Параметры НПС / Объекта", padding=8)
         left.pack(side=tk.LEFT, fill=tk.Y, padx=(0, 8))
 
@@ -1346,7 +1317,6 @@ class RPGContentStudio:
             ttk.Label(left, text=lbl).grid(row=idx, column=0, sticky=tk.W, pady=2)
             w.grid(row=idx, column=1, sticky=tk.W, pady=2, padx=4)
 
-        # Средняя колонка: Конструктор внешности из запчастей
         mid = ttk.LabelFrame(tab, text="Внешность (Запчасти)", padding=8)
         mid.pack(side=tk.LEFT, fill=tk.Y, padx=(0, 8))
 
@@ -1366,15 +1336,6 @@ class RPGContentStudio:
         self.app_eye_col_var = tk.IntVar(value=0)
         self.app_cloth_col_var = tk.IntVar(value=0)
 
-        app_controls = [
-            ("Одежда:", ttk.Combobox(mid, textvariable=self.app_body_var, state="readonly", width=18, values=list(BODY_LAYERS.keys()))),
-            ("Голова:", ttk.Combobox(mid, textvariable=self.app_head_var, state="readonly", width=18, values=list(HEAD_LAYERS.keys()))),
-            ("Прическа:", ttk.Combobox(mid, textvariable=self.app_hair_var, state="readonly", width=18, values=list(HAIR_LAYERS.keys()))),
-            ("Кожа (индекс):", ttk.Spinbox(mid, from_=0, to=len(SKIN_COLORS)-1, textvariable=self.app_skin_var, width=6, command=self.update_npc_preview)),
-            ("Цвет волос:", ttk.Spinbox(mid, from_=0, to=len(HAIR_COLORS)-1, textvariable=self.app_hair_col_var, width=6, command=self.update_npc_preview)),
-            ("Цвет глаз:", ttk.Spinbox(mid, from_=0, to=len(EYE_COLORS)-1, textvariable=self.app_eye_col_var, width=6, command=self.update_npc_preview)),
-            ("Цвет одежды:", ttk.Spinbox(mid, from_=0, to=len(CLOTH_COLORS)-1, textvariable=self.app_cloth_col_var, width=6, command=self.update_npc_preview)),
-        ]
         app_grid = ttk.Frame(mid)
         app_grid.pack(fill=tk.X, pady=4)
 
@@ -1398,7 +1359,6 @@ class RPGContentStudio:
         ttk.Button(btns, text="Сохранить НПС", command=self.save_npc).pack(side=tk.LEFT, padx=3)
         ttk.Button(btns, text="Удалить", command=self.delete_npc).pack(side=tk.LEFT, padx=3)
 
-        # Правая колонка: Таблица всех НПС в базе
         right = ttk.Frame(tab)
         right.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
@@ -1538,6 +1498,7 @@ class RPGContentStudio:
             self.db.conn.execute("DELETE FROM npc_templates WHERE id = ?", (nid,))
             self.db.conn.commit()
             self.refresh_npcs_table()
+
 
 if __name__ == "__main__":
     root = tk.Tk()

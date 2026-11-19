@@ -42,15 +42,31 @@ PALETTE = {
 }
 
 
+def resolve_color(token):
+    """Возвращает (R, G, B) или None по старой букве из PALETTE либо по HEX-строке '#rrggbb'"""
+    if not token or token == ".":
+        return None
+    if token in PALETTE:
+        return PALETTE[token]
+    if isinstance(token, str) and token.startswith("#") and len(token) == 7:
+        try:
+            return (int(token[1:3], 16), int(token[3:5], 16), int(token[5:7], 16))
+        except ValueError:
+            return None
+    return None
+
 def build_sprite(art_matrix):
-    """Превращает текстовую матрицу 16x16 в Surface с прозрачностью"""
+    """Превращает матрицу 16x16 (из букв или HEX-цветов '#rrggbb') в Surface с прозрачностью"""
     surf = pygame.Surface((16, 16), pygame.SRCALPHA)
     for r, row in enumerate(art_matrix[:16]):
-        for c, ch in enumerate(row[:16]):
-            col = PALETTE.get(ch)
+        # Поддерживаем и старый формат (строка из 16 символов), и новый (список из 16 токенов)
+        cells = list(row[:16]) if isinstance(row, str) else row[:16]
+        for c, token in enumerate(cells):
+            col = resolve_color(token)
             if col:
                 surf.set_at((c, r), col)
     return surf
+
 
 def load_sprites(db):
     """Загружает все спрайты напрямую из таблицы sprites_catalog базы данных"""
