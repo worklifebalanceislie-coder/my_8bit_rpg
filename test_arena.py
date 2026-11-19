@@ -20,6 +20,8 @@ from items import ITEMS_DB
 from appearance import build_character_sprite, generate_random_appearance
 from monster_gen import generate_monster
 from building_gen import generate_building
+from interior_gen import generate_interior
+
 
 
 def build_showcase_map(world):
@@ -221,6 +223,8 @@ def run_test_arena():
     ui = UIManager(player, world.entities, sprites.get("loot"), sprites)
 
     status_msg = "ПОЛИГОН | F1: Полный хил | F2: +1000G и Уровень | F3: Спавн врагов | I/P/K/C: Окна"
+    outdoor_world = world
+    interiors_cache = {}
 
     while True:
         dt = clock.tick(FPS) / 1000.0
@@ -238,10 +242,6 @@ def run_test_arena():
 
             if ui.handle_global_hotkey(event):
                 continue
-            for bld in getattr(world, "buildings", []):
-                if player.rect.colliderect(bld.door_rect):
-                    status_msg = f"Дверь: {bld.name} [{bld.meta['size']}, крыша: {bld.meta['roof_style']}] (интерьер в разработке)"
-                    break
 
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
@@ -309,6 +309,38 @@ def run_test_arena():
                             if msg:
                                 status_msg = msg
                                 break
+                    for bld in getattr(world, "buildings", []):
+                        if player.rect.colliderect(bld.door_rect):
+                            if bld.id not in interiors_cache:
+                                interiors_cache[bld.id] = generate_interior(bld, sprites, player.rect.topleft)
+                            world = interiors_cache[bld.id]
+                            if player not in world.entities:
+                                world.entities.insert(0, player)
+                            player.rect.topleft = world.spawn_pos
+                            player.movement.pos_x, player.movement.pos_y = float(player.rect.x), float(player.rect.y)
+                            camera = Camera(world.width, world.height)
+                            status_msg = f"Вы вошли: {bld.name} (Подойдите к двери внизу и нажмите [E], чтобы выйти)"
+                            break
+                    else:
+                        if getattr(world, "exit_rect", None) and player.rect.colliderect(world.exit_rect):
+                            ret_pos = world.return_pos
+                            world = outdoor_world
+                            player.rect.topleft = ret_pos
+                            player.movement.pos_x, player.movement.pos_y = float(player.rect.x), float(player.rect.y)
+                            camera = Camera(world.width, world.height)
+                            status_msg = "Вы вышли на площадь."
+                        else:
+                            for prop_rect, p_kind, _ in getattr(world, "interactive_props", []):
+                                if player.rect.colliderect(prop_rect):
+                                    if p_kind == "bed":
+                                        player.stats.hp = float(player.stats.max_hp)
+                                        player.stats.mp = float(player.stats.max_mp)
+                                        status_msg = "Вы отдохнули на кровати: HP и MP полностью восстановлены!"
+                                    elif p_kind == "workbench":
+                                        ui.open_professions()
+                                    break
+
+
 
             elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1 and player.combat:
                 mx, my = event.pos
