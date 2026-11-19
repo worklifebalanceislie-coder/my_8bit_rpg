@@ -1,0 +1,50 @@
+# Байткод и кэш Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Виртуальные окружения
+venv/
+.venv/
+env/
+ENV/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Секреты, переменные окружения и локальные конфиги
+.env
+.env.*
+!.env.example
+local_settings.py
+
+# Логи и временные файлы
+*.log
+.coverage
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+
+# Среды разработки (IDE) и файлы ОС
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
