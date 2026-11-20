@@ -34,8 +34,8 @@ class WorldMap:
         self.building_plots = []
         self.entities = []
         self.projectiles = []
-        self.build_town_square()
         self.buildings = []
+        self.build_town_square()
 
 
     def draw_speeches(self, screen, camera, scale, speech_font):

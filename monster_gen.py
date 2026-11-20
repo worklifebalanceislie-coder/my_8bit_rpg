@@ -10,7 +10,7 @@ from components.combat import Combat
 from components.ai import AIController
 from components.skills import SkillBook
 import json
-from sprites import PALETTE, resolve_color
+from sprites import PALETTE
 
 
 
@@ -154,7 +154,7 @@ PARTS = {
 
 def assemble_monster_sprite(part_keys, body_c, dark_c, eye_c):
     surf = pygame.Surface((16, 16), pygame.SRCALPHA)
-    custom_pal = resolve_color(ch)
+    custom_pal = dict(PALETTE)
     custom_pal["M"] = body_c
     custom_pal["m"] = dark_c
     custom_pal["B"] = body_c

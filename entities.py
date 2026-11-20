@@ -38,10 +38,8 @@ class Entity:
         self.combat = None
         self.skills = None
         self.ai = None
-        self.skills = None
         self.quests = None
         self.dialogue = None
-        self.ai = None
     
     def use_quick_item(self, slot_idx):
         if not self.inventory or slot_idx < 0 or slot_idx >= len(self.quick_items):

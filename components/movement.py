@@ -1,5 +1,3 @@
-import pygame
-
 class Movement:
     def __init__(self, owner, speed=60):
         self.owner = owner
@@ -31,16 +29,12 @@ class Movement:
         elif dx > 0:
             self.owner.facing_left = False
 
+        # Диагональное движение: нормализуем скорость, чтобы шло по диагонали так же быстро, как по прямой
         if dx != 0 and dy != 0:
             dx *= 0.7071
             dy *= 0.7071
 
         self.owner.facing_dir = (dx, dy)
-
-
-        if dx != 0 and dy != 0:
-            dx *= 0.7071
-            dy *= 0.7071
 
         self.pos_x += dx * self.speed * dt
         self.owner.rect.x = round(self.pos_x)
