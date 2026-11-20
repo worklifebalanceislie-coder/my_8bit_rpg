@@ -1538,6 +1538,9 @@ class RPGContentStudio:
         ttk.Button(btns, text="Сохранить комнату", command=self.save_interior_room).pack(side=tk.LEFT, padx=3)
         ttk.Button(btns, text="Удалить", command=self.delete_interior_room).pack(side=tk.LEFT, padx=3)
 
+        sprite_cb = ttk.Combobox(left, textvariable=self.f_sprite, width=19, values=self.get_sprite_keys())
+        sprite_cb.bind("<<ComboboxSelected>>", lambda *_: self.update_furniture_preview())
+
         # Правая колонка: Визуальная сетка комнаты (ЛКМ — поставить мебель, ПКМ — убрать)
         right = ttk.LabelFrame(tab, text="План комнаты (ЛКМ — поставить мебель, ПКМ — убрать)", padding=8)
         right.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
@@ -1674,10 +1677,13 @@ class RPGContentStudio:
         self.f_action = tk.StringVar(value="")
         self.f_label = tk.StringVar(value="")
 
+        sprite_cb = ttk.Combobox(furn_box, textvariable=self.f_sprite, width=19, values=self.get_sprite_keys())
+        sprite_cb.bind("<<ComboboxSelected>>", lambda *_: self.update_furniture_preview())
+
         f_rows = [
             ("ID (англ):", ttk.Entry(furn_box, textvariable=self.f_id, width=22)),
             ("Название:", ttk.Entry(furn_box, textvariable=self.f_name, width=22)),
-            ("Спрайт 16x16:", ttk.Combobox(furn_box, textvariable=self.f_sprite, width=19, values=self.get_sprite_keys())),
+            ("Спрайт 16x16:", sprite_cb),
             ("Действие [E]:", ttk.Combobox(furn_box, textvariable=self.f_action, state="readonly", width=19, values=["", "bed", "workbench"])),
             ("Подсказка:", ttk.Entry(furn_box, textvariable=self.f_label, width=22)),
         ]
@@ -1692,9 +1698,15 @@ class RPGContentStudio:
         ttk.Button(f_btns, text="Сохранить мебель", command=self.save_furniture_item).pack(side=tk.LEFT, padx=3)
         ttk.Button(f_btns, text="Удалить", command=self.delete_furniture_item).pack(side=tk.LEFT, padx=3)
 
-        ttk.Label(furn_box, text="Каталог мебели (выберите для кисти):", font=("Segoe UI", 9, "bold")).grid(row=7, column=0, columnspan=2, sticky=tk.W, pady=(8, 2))
-        self.furn_listbox = tk.Listbox(furn_box, height=13, width=34, font=("Consolas", 9))
-        self.furn_listbox.grid(row=8, column=0, columnspan=2, sticky=tk.NSEW)
+        prev_f = ttk.Frame(furn_box)
+        prev_f.grid(row=7, column=0, columnspan=2, pady=4)
+        ttk.Label(prev_f, text="Предпросмотр (4x):").pack(side=tk.LEFT, padx=(0, 8))
+        self.furn_preview_cv = tk.Canvas(prev_f, width=64, height=64, bg="#232734", highlightthickness=1)
+        self.furn_preview_cv.pack(side=tk.LEFT)
+
+        ttk.Label(furn_box, text="Каталог мебели (выберите для кисти):", font=("Segoe UI", 9, "bold")).grid(row=8, column=0, columnspan=2, sticky=tk.W, pady=(6, 2))
+        self.furn_listbox = tk.Listbox(furn_box, height=10, width=34, font=("Consolas", 9))
+        self.furn_listbox.grid(row=9, column=0, columnspan=2, sticky=tk.NSEW)
         self.furn_listbox.bind("<<ListboxSelect>>", self.on_furniture_select)
 
         # Правая колонка: Список комнат и план расстановки
@@ -1732,6 +1744,36 @@ class RPGContentStudio:
         self.refresh_furniture_list()
         self.refresh_interiors_list()
 
+    def update_furniture_preview(self):
+        if not hasattr(self, "furn_preview_cv"):
+            return
+        self.furn_preview_cv.delete("all")
+        s_key = self.f_sprite.get().strip()
+        fid = self.f_id.get().strip()
+
+        if s_key:
+            cur = self.db.conn.cursor()
+            cur.execute("SELECT art_matrix FROM sprites_catalog WHERE sprite_key = ?", (s_key,))
+            row = cur.fetchone()
+            if row:
+                mat = json.loads(row["art_matrix"])
+                for r, line in enumerate(mat[:16]):
+                    cells = list(line[:16]) if isinstance(line, str) else line[:16]
+                    for c, token in enumerate(cells):
+                        rgb = resolve_color(token)
+                        if rgb:
+                            self.furn_preview_cv.create_rectangle(c * 4, r * 4, c * 4 + 4, r * 4 + 4, fill=rgb_to_hex(rgb), outline="")
+                return
+
+        if fid:
+            from furniture import get_furniture_sprite
+            surf = get_furniture_sprite(fid)
+            for y in range(16):
+                for x in range(16):
+                    r, g, b, a = surf.get_at((x, y))
+                    if a > 0:
+                        self.furn_preview_cv.create_rectangle(x * 4, y * 4, x * 4 + 4, y * 4 + 4, fill=rgb_to_hex((r, g, b)), outline="")
+
     def refresh_furniture_list(self):
         if not hasattr(self, "furn_listbox"):
             return
@@ -1757,6 +1799,7 @@ class RPGContentStudio:
             self.f_solid.set(bool(r["solid"]))
             self.f_action.set(r["interact_kind"] or "")
             self.f_label.set(r["label"] or "")
+            self.update_furniture_preview()
 
     def save_furniture_item(self):
         fid = self.f_id.get().strip()
@@ -1771,6 +1814,7 @@ class RPGContentStudio:
         )
         self.db.conn.commit()
         self.refresh_furniture_list()
+        self.update_furniture_preview()
         self.set_status(f"Мебель '{fname}' сохранена в БД!")
 
     def delete_furniture_item(self):
