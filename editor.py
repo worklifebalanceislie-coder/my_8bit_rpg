@@ -36,6 +36,7 @@ class RPGContentStudio:
         self.build_monsters_tab()
         self.build_professions_tab()
         self.build_npcs_tab()
+        self.build_interiors_tab()
 
         self.status_var = tk.StringVar(value="База данных rpg.db подключена и готова к работе.")
         ttk.Label(self.root, textvariable=self.status_var, relief=tk.SUNKEN, anchor=tk.W).pack(fill=tk.X, side=tk.BOTTOM)
@@ -58,7 +59,8 @@ class RPGContentStudio:
         tables = [
             "sprites_catalog", "items_catalog", "skills_catalog", "effects_catalog",
             "races_catalog", "classes_catalog", "factions_catalog", "npc_templates",
-            "monster_archetypes", "monster_parts", "professions_catalog", "recipes_catalog"
+            "monster_archetypes", "monster_parts", "professions_catalog", "recipes_catalog",
+            "furniture_catalog", "building_interiors"
         ]
         dump = {}
         for t in tables:
@@ -103,6 +105,8 @@ class RPGContentStudio:
         self.refresh_monsters_tables()
         self.refresh_professions_tables()
         self.refresh_npcs_table()
+        self.refresh_interiors_list()
+
     def build_sprites_tab(self):
         tab = ttk.Frame(self.notebook, padding=10)
         self.notebook.add(tab, text="1. Спрайты (16x16)")
@@ -1499,6 +1503,283 @@ class RPGContentStudio:
             self.db.conn.commit()
             self.refresh_npcs_table()
 
+    # =========================================================================
+    # 10. ВКЛАДКА ИНТЕРЬЕРОВ И МЕБЕЛИ
+    # =========================================================================
+    def build_interiors_tab(self):
+        from furniture import DEFAULT_FURNITURE
+
+        tab = ttk.Frame(self.notebook, padding=10)
+        self.notebook.add(tab, text="10. Интерьеры")
+
+        # Левая колонка: Список комнат в БД и выбор мебели
+        left = ttk.LabelFrame(tab, text="Комнаты в БД и Мебель", padding=8)
+        left.pack(side=tk.LEFT, fill=tk.Y, padx=(0, 10))
+
+        self.int_listbox = tk.Listbox(left, height=8, width=28, font=("Consolas", 10))
+        self.int_listbox.pack(fill=tk.X, pady=(0, 6))
+        self.int_listbox.bind("<<ListboxSelect>>", self.on_interior_select)
+
+        ttk.Label(left, text="Выберите предмет мебели:", font=("Segoe UI", 9, "bold")).pack(anchor=tk.W, pady=(4, 2))
+        self.furn_var = tk.StringVar(value="table")
+        for f in DEFAULT_FURNITURE:
+            ttk.Radiobutton(left, text=f"{f['name']} ({f['id']})", variable=self.furn_var, value=f["id"]).pack(anchor=tk.W)
+
+        self.int_floor_var = tk.StringVar(value="wood_floor")
+        floor_bar = ttk.Frame(left)
+        floor_bar.pack(fill=tk.X, pady=8)
+        ttk.Label(floor_bar, text="Пол:").pack(side=tk.LEFT)
+        cb_fl = ttk.Combobox(floor_bar, textvariable=self.int_floor_var, state="readonly", width=14, values=["wood_floor", "stone_floor"])
+        cb_fl.pack(side=tk.LEFT, padx=4)
+        cb_fl.bind("<<ComboboxSelected>>", lambda *_: self.redraw_interior_canvas())
+
+        btns = ttk.Frame(left)
+        btns.pack(pady=6)
+        ttk.Button(btns, text="Сохранить комнату", command=self.save_interior_room).pack(side=tk.LEFT, padx=3)
+        ttk.Button(btns, text="Удалить", command=self.delete_interior_room).pack(side=tk.LEFT, padx=3)
+
+        # Правая колонка: Визуальная сетка комнаты (ЛКМ — поставить мебель, ПКМ — убрать)
+        right = ttk.LabelFrame(tab, text="План комнаты (ЛКМ — поставить мебель, ПКМ — убрать)", padding=8)
+        right.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+
+        self.cur_int_id = None
+        self.int_cols = 16
+        self.int_rows = 11
+        self.int_props = []
+        self.int_npcs = []
+        self.int_cell = 28
+
+        self.int_canvas = tk.Canvas(right, width=680, height=480, bg="#1e222d", highlightthickness=1)
+        self.int_canvas.pack(pady=4)
+        self.int_canvas.bind("<Button-1>", self.on_interior_click)
+        self.int_canvas.bind("<Button-3>", self.on_interior_erase)
+
+        self.refresh_interiors_list()
+
+    def refresh_interiors_list(self):
+        if not hasattr(self, "int_combo"):
+            return
+        cur = self.db.conn.cursor()
+        cur.execute("SELECT building_id, cols, rows FROM building_interiors ORDER BY building_id")
+        vals = [f"{r['building_id']} ({r['cols']}x{r['rows']})" for r in cur.fetchall()]
+        self.int_combo["values"] = vals
+        if vals and not self.cur_int_id:
+            self.int_combo.current(0)
+            self.on_interior_select(None)
+
+    def on_interior_select(self, _):
+        raw = self.int_combo.get()
+        if not raw:
+            return
+        bid, *_ = raw.split(" (")
+        row = self.db.get_building_interior(bid)
+        if not row:
+            return
+        self.cur_int_id = bid
+        self.int_cols = row["cols"]
+        self.int_rows = row["rows"]
+        self.int_floor_var.set(row["floor_tile"])
+        self.int_props = json.loads(row["props_json"])
+        self.int_npcs = json.loads(row["npcs_json"])
+        self.redraw_interior_canvas()
+
+    def redraw_interior_canvas(self):
+        self.int_canvas.delete("all")
+        cs = self.int_cell
+        floor_bg = "#80542e" if self.int_floor_var.get() == "wood_floor" else "#696e78"
+
+        for r in range(self.int_rows):
+            for c in range(self.int_cols):
+                is_wall = (r == 0 or r == self.int_rows - 1 or c == 0 or c == self.int_cols - 1)
+                is_door = (r == self.int_rows - 1 and c == self.int_cols // 2)
+                col = "#a53030" if is_door else ("#484d59" if is_wall else floor_bg)
+                self.int_canvas.create_rectangle(c * cs, r * cs, (c + 1) * cs, (r + 1) * cs, fill=col, outline="#2a2f3d")
+
+        # Отрисовка мебели на плане
+        prop_colors = {
+            "table": "#b8783c", "chair": "#8c5626", "barrel": "#9e622c",
+            "bookshelf": "#6e4422", "bed": "#c83c46", "anvil": "#8c96a8",
+            "forge": "#eb5a1e", "weapon_rack": "#788294", "plant": "#3ca046"
+        }
+        for p in self.int_props:
+            c, r, pid = p["c"], p["r"], p["id"]
+            bg = prop_colors.get(pid, "#d2b45a")
+            self.int_canvas.create_rectangle(c * cs + 2, r * cs + 2, (c + 1) * cs - 2, (r + 1) * cs - 2, fill=bg, outline="#14141c", width=2)
+            self.int_canvas.create_text(c * cs + cs // 2, r * cs + cs // 2, text=pid[:3].upper(), fill="#ffffff", font=("Consolas", 7, "bold"))
+
+        # Отрисовка НПС внутри комнаты
+        for n in self.int_npcs:
+            c, r = n["c"], n["r"]
+            self.int_canvas.create_oval(c * cs + 4, r * cs + 4, (c + 1) * cs - 4, (r + 1) * cs - 4, fill="#46a0f0", outline="#ffffff")
+
+    def on_interior_click(self, event):
+        fid = self.f_id.get().strip()
+        if not self.cur_int_id or not fid:
+            return
+        c, r = event.x // self.int_cell, event.y // self.int_cell
+        if 1 <= c < self.int_cols - 1 and 1 <= r < self.int_rows - 1:
+            self.int_props = [p for p in self.int_props if not (p["c"] == c and p["r"] == r)]
+            cur = self.db.conn.cursor()
+            cur.execute("SELECT * FROM furniture_catalog WHERE id = ?", (fid,))
+            meta = cur.fetchone()
+            self.int_props.append({
+                "c": c, "r": r, "id": fid,
+                "solid": bool(meta["solid"]) if meta else True,
+                "interact_kind": meta["interact_kind"] if meta else None,
+                "label": meta["label"] if meta else "",
+                "sprite_key": meta["sprite_key"] if meta else None
+            })
+            self.redraw_interior_canvas()
+
+    def on_interior_erase(self, event):
+        if not self.cur_int_id:
+            return
+        c, r = event.x // self.int_cell, event.y // self.int_cell
+        self.int_props = [p for p in self.int_props if not (p["c"] == c and p["r"] == r)]
+        self.redraw_interior_canvas()
+
+    def save_interior_room(self):
+        if not self.cur_int_id:
+            return
+        row = self.db.get_building_interior(self.cur_int_id)
+        kind = row["kind"] if row else "house"
+        self.db.save_building_interior(self.cur_int_id, kind, self.int_cols, self.int_rows, self.int_floor_var.get(), self.int_props, self.int_npcs)
+        self.set_status(f"Интерьер '{self.cur_int_id}' сохранен в БД!")
+
+    def delete_interior_room(self):
+        if not self.cur_int_id:
+            return
+        self.db.conn.execute("DELETE FROM building_interiors WHERE building_id = ?", (self.cur_int_id,))
+        self.db.conn.commit()
+        self.cur_int_id = None
+        self.int_canvas.delete("all")
+        self.refresh_interiors_list()
+        self.set_status("Интерьер удален (при входе в здание он сгенерируется заново).")
+
+    # =========================================================================
+    # 10. ВКЛАДКА ИНТЕРЬЕРОВ И КОНСТРУКТОР МЕБЕЛИ
+    # =========================================================================
+    def build_interiors_tab(self):
+        tab = ttk.Frame(self.notebook, padding=10)
+        self.notebook.add(tab, text="10. Интерьеры и Мебель")
+
+        # Левая колонка: Конструктор новой мебели
+        furn_box = ttk.LabelFrame(tab, text="Создать / Изменить мебель", padding=8)
+        furn_box.pack(side=tk.LEFT, fill=tk.Y, padx=(0, 8))
+
+        self.f_id = tk.StringVar()
+        self.f_name = tk.StringVar()
+        self.f_sprite = tk.StringVar(value="")
+        self.f_solid = tk.BooleanVar(value=True)
+        self.f_action = tk.StringVar(value="")
+        self.f_label = tk.StringVar(value="")
+
+        f_rows = [
+            ("ID (англ):", ttk.Entry(furn_box, textvariable=self.f_id, width=22)),
+            ("Название:", ttk.Entry(furn_box, textvariable=self.f_name, width=22)),
+            ("Спрайт 16x16:", ttk.Combobox(furn_box, textvariable=self.f_sprite, width=19, values=self.get_sprite_keys())),
+            ("Действие [E]:", ttk.Combobox(furn_box, textvariable=self.f_action, state="readonly", width=19, values=["", "bed", "workbench"])),
+            ("Подсказка:", ttk.Entry(furn_box, textvariable=self.f_label, width=22)),
+        ]
+        for idx, (lbl, w) in enumerate(f_rows):
+            ttk.Label(furn_box, text=lbl).grid(row=idx, column=0, sticky=tk.W, pady=2)
+            w.grid(row=idx, column=1, sticky=tk.W, pady=2, padx=4)
+
+        ttk.Checkbutton(furn_box, text="Твердый объект (нельзя пройти сквозь)", variable=self.f_solid).grid(row=5, column=0, columnspan=2, sticky=tk.W, pady=4)
+
+        f_btns = ttk.Frame(furn_box)
+        f_btns.grid(row=6, column=0, columnspan=2, pady=6)
+        ttk.Button(f_btns, text="Сохранить мебель", command=self.save_furniture_item).pack(side=tk.LEFT, padx=3)
+        ttk.Button(f_btns, text="Удалить", command=self.delete_furniture_item).pack(side=tk.LEFT, padx=3)
+
+        ttk.Label(furn_box, text="Каталог мебели (выберите для кисти):", font=("Segoe UI", 9, "bold")).grid(row=7, column=0, columnspan=2, sticky=tk.W, pady=(8, 2))
+        self.furn_listbox = tk.Listbox(furn_box, height=13, width=34, font=("Consolas", 9))
+        self.furn_listbox.grid(row=8, column=0, columnspan=2, sticky=tk.NSEW)
+        self.furn_listbox.bind("<<ListboxSelect>>", self.on_furniture_select)
+
+        # Правая колонка: Список комнат и план расстановки
+        right = ttk.LabelFrame(tab, text="Комнаты в БД и План расстановки (ЛКМ — поставить, ПКМ — убрать)", padding=8)
+        right.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+
+        top_bar = ttk.Frame(right)
+        top_bar.pack(fill=tk.X, pady=(0, 6))
+        ttk.Label(top_bar, text="Комната:").pack(side=tk.LEFT)
+        self.int_combo = ttk.Combobox(top_bar, state="readonly", width=26)
+        self.int_combo.pack(side=tk.LEFT, padx=6)
+        self.int_combo.bind("<<ComboboxSelected>>", self.on_interior_select)
+
+        ttk.Label(top_bar, text="Пол:").pack(side=tk.LEFT, padx=(8, 2))
+        self.int_floor_var = tk.StringVar(value="wood_floor")
+        cb_fl = ttk.Combobox(top_bar, textvariable=self.int_floor_var, state="readonly", width=13, values=["wood_floor", "stone_floor"])
+        cb_fl.pack(side=tk.LEFT, padx=4)
+        cb_fl.bind("<<ComboboxSelected>>", lambda *_: self.redraw_interior_canvas())
+
+        ttk.Button(top_bar, text="Сохранить план", command=self.save_interior_room).pack(side=tk.LEFT, padx=6)
+        ttk.Button(top_bar, text="Сбросить", command=self.delete_interior_room).pack(side=tk.LEFT, padx=2)
+
+        self.cur_int_id = None
+        self.int_cols = 16
+        self.int_rows = 11
+        self.int_props = []
+        self.int_npcs = []
+        self.int_cell = 26
+
+        self.int_canvas = tk.Canvas(right, width=660, height=460, bg="#1e222d", highlightthickness=1)
+        self.int_canvas.pack(pady=4)
+        self.int_canvas.bind("<Button-1>", self.on_interior_click)
+        self.int_canvas.bind("<Button-3>", self.on_interior_erase)
+
+        self.refresh_furniture_list()
+        self.refresh_interiors_list()
+
+    def refresh_furniture_list(self):
+        if not hasattr(self, "furn_listbox"):
+            return
+        self.furn_listbox.delete(0, tk.END)
+        cur = self.db.conn.cursor()
+        cur.execute("SELECT id, name FROM furniture_catalog ORDER BY id")
+        for r in cur.fetchall():
+            self.furn_listbox.insert(tk.END, f"{r['id']} — {r['name']}")
+
+    def on_furniture_select(self, _):
+        sel = self.furn_listbox.curselection()
+        if not sel:
+            return
+        idx, *_ = sel
+        fid, *_ = self.furn_listbox.get(idx).split(" — ")
+        cur = self.db.conn.cursor()
+        cur.execute("SELECT * FROM furniture_catalog WHERE id = ?", (fid,))
+        r = cur.fetchone()
+        if r:
+            self.f_id.set(r["id"])
+            self.f_name.set(r["name"])
+            self.f_sprite.set(r["sprite_key"] or "")
+            self.f_solid.set(bool(r["solid"]))
+            self.f_action.set(r["interact_kind"] or "")
+            self.f_label.set(r["label"] or "")
+
+    def save_furniture_item(self):
+        fid = self.f_id.get().strip()
+        fname = self.f_name.get().strip()
+        if not fid or not fname:
+            return
+        self.db.conn.execute(
+            "INSERT OR REPLACE INTO furniture_catalog VALUES (?, ?, ?, ?, ?, ?)",
+            (fid, fname, 1 if self.f_solid.get() else 0,
+             self.f_action.get().strip() or None, self.f_label.get().strip(),
+             self.f_sprite.get().strip() or None)
+        )
+        self.db.conn.commit()
+        self.refresh_furniture_list()
+        self.set_status(f"Мебель '{fname}' сохранена в БД!")
+
+    def delete_furniture_item(self):
+        fid = self.f_id.get().strip()
+        if fid:
+            self.db.conn.execute("DELETE FROM furniture_catalog WHERE id = ?", (fid,))
+            self.db.conn.commit()
+            self.refresh_furniture_list()
+            self.set_status(f"Мебель '{fid}' удалена.")
 
 if __name__ == "__main__":
     root = tk.Tk()

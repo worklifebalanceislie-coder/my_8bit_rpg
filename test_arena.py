@@ -265,6 +265,9 @@ def run_test_arena():
                     world.entities.append(mob)
                     status_msg = f"F3: На арене появился {mob.name}!"
                 elif event.key == pygame.K_F4:
+                    interiors_cache.clear()
+                    db.conn.execute("DELETE FROM building_interiors")
+                    db.conn.commit()
                     # Перестраиваем здания с новыми случайными формами и крышами
                     world.buildings = [
                         generate_building(tile_x=11, tile_y=2, kind="tavern", size="large"),
@@ -312,7 +315,7 @@ def run_test_arena():
                     for bld in getattr(world, "buildings", []):
                         if player.rect.colliderect(bld.door_rect):
                             if bld.id not in interiors_cache:
-                                interiors_cache[bld.id] = generate_interior(bld, sprites, player.rect.topleft)
+                                interiors_cache[bld.id] = generate_interior(bld, sprites, player.rect.topleft, db=db)
                             world = interiors_cache[bld.id]
                             if player not in world.entities:
                                 world.entities.insert(0, player)

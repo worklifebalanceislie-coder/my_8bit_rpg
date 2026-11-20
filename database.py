@@ -164,6 +164,30 @@ class DatabaseManager:
         except Exception:
             pass
 
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS furniture_catalog (
+                id TEXT PRIMARY KEY,
+                name TEXT,
+                solid INTEGER,
+                interact_kind TEXT,
+                label TEXT
+            )
+        """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS building_interiors (
+                building_id TEXT PRIMARY KEY,
+                kind TEXT,
+                cols INTEGER,
+                rows INTEGER,
+                floor_tile TEXT,
+                props_json TEXT,
+                npcs_json TEXT
+            )
+        """)
+        try:
+            cur.execute("ALTER TABLE furniture_catalog ADD COLUMN sprite_key TEXT")
+        except Exception:
+            pass
     
     def sync_all_catalogs(self):
         cur = self.conn.cursor()
@@ -176,6 +200,12 @@ class DatabaseManager:
         self.load_skills_to_memory()
         self.load_factions_to_memory()
         self.sync_professions_catalog()
+
+        from furniture import DEFAULT_FURNITURE
+        for f in DEFAULT_FURNITURE:
+            cur.execute("INSERT OR IGNORE INTO furniture_catalog VALUES (?, ?, ?, ?, ?, NULL)",
+                        (f["id"], f["name"], f["solid"], f["interact_kind"], f["label"]))
+        self.conn.commit()
 
     def import_from_json_file(self, filepath):
         with open(filepath, "r", encoding="utf-8") as f:
@@ -371,6 +401,8 @@ class DatabaseManager:
             "effects": [{"id": e.id, "duration": e.duration, "power": e.power} for e in ent.effects.active] if getattr(ent, "effects", None) else [],
             "professions": ent.professions.learned if getattr(ent, "professions", None) else {},
             "appearance": getattr(ent, "appearance", None),
+            "max_active_slots": ent.skills.max_active_slots if getattr(ent, "skills", None) else 2,
+            "quick_items": getattr(ent, "quick_items", [None, None, None, None]),
         }
         return json.dumps(data, ensure_ascii=False)
 
@@ -432,6 +464,11 @@ class DatabaseManager:
 
         if getattr(ent, "professions", None) and data.get("professions"):
             ent.professions.learned = data["professions"]
+        
+        if getattr(ent, "skills", None):
+            ent.skills.max_active_slots = data.get("max_active_slots", 2)
+        if "quick_items" in data:
+            ent.quick_items = data["quick_items"]
 
         ent.link_components()
         return ent
@@ -687,3 +724,18 @@ class DatabaseManager:
                 r["id"], r["prof_id"], r["result_item_id"],
                 r["req_level"], json.loads(r["materials_json"]), r["xp_gain"]
             )
+
+    def get_building_interior(self, building_id):
+        cur = self.conn.cursor()
+        cur.execute("SELECT * FROM building_interiors WHERE building_id = ?", (building_id,))
+        row = cur.fetchone()
+        return dict(row) if row else None
+
+    def save_building_interior(self, building_id, kind, cols, rows, floor_tile, props_list, npcs_list):
+        self.conn.execute(
+            "INSERT OR REPLACE INTO building_interiors VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (building_id, kind, cols, rows, floor_tile,
+             json.dumps(props_list, ensure_ascii=False),
+             json.dumps(npcs_list, ensure_ascii=False))
+        )
+        self.conn.commit()
