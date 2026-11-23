@@ -156,6 +156,11 @@ class WorldMap:
                 if spr:
                     surface.blit(spr, (c * TILE_SIZE - camera.offset_x, r * TILE_SIZE - camera.offset_y))
 
+        # 1.5 Плавные переходы между биомами (если реализованы в наследнике)
+        overlay = getattr(self, "draw_ground_overlays", None)
+        if overlay:
+            overlay(surface, camera)
+
         # 2. Пустые участки под постройку
         for idx, plot in enumerate(self.building_plots):
             r_scr = camera.apply_rect(plot)
