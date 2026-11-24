@@ -156,6 +156,9 @@ class WorldMap:
                 if spr:
                     surface.blit(spr, (c * TILE_SIZE - camera.offset_x, r * TILE_SIZE - camera.offset_y))
 
+        if hasattr(self, "draw_ground_overlays"):
+            self.draw_ground_overlays(surface, camera)
+
         # 1.5 Плавные переходы между биомами (если реализованы в наследнике)
         overlay = getattr(self, "draw_ground_overlays", None)
         if overlay:

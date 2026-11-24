@@ -258,7 +258,8 @@ def run_test_world_gen():
                                     depth=depth,
                                     return_pos=player.rect.topleft,
                                     sprites=sprites, db=db,
-                                    rng=random.Random(hash(bld.id)))
+                                    rng=random.Random(hash(bld.id)),
+                                    size=40 + depth * 6)
                             status_msg = enter_map(
                                 dungeons_cache[bld.id],
                                 f"Вы спустились: Подземелье (глубина {depth}). "

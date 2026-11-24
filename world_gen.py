@@ -189,21 +189,55 @@ def _make_sand_road(s):  # грунтовая дорога по песку (за
 
 
 def _prop_tree(s):
-    """Дуб: крона 16x16 сверху, ствол внизу (высота спрайта 24)."""
-    pygame.draw.rect(s, (96, 64, 34), (6, 15, 4, 9))
-    pygame.draw.rect(s, (72, 46, 24), (9, 15, 2, 9))
-    pygame.draw.circle(s, (38, 92, 46), (8, 9), 7)
-    pygame.draw.circle(s, (54, 122, 58), (7, 8), 6)
-    pygame.draw.circle(s, (74, 150, 74), (6, 6), 4)
-    s.set_at((4, 4), (96, 176, 92))
-    s.set_at((11, 10), (34, 82, 42))
+    """Крупный раскидистый дуб 32x36 px (2x2 тайла) с тенью"""
+    # Тень на земле
+    pygame.draw.ellipse(s, (20, 35, 22, 95), (4, 28, 24, 7))
+    # Мощный ствол с корнями
+    pygame.draw.rect(s, (96, 62, 32), (13, 21, 6, 12))
+    pygame.draw.rect(s, (68, 42, 20), (17, 21, 2, 12))
+    pygame.draw.rect(s, (96, 62, 32), (11, 31, 10, 2))
+    # Пышная многослойная крона
+    pygame.draw.circle(s, (32, 82, 40), (16, 14), 13)
+    pygame.draw.circle(s, (32, 82, 40), (9, 17), 8)
+    pygame.draw.circle(s, (32, 82, 40), (23, 17), 8)
+    pygame.draw.circle(s, (48, 114, 54), (15, 13), 11)
+    pygame.draw.circle(s, (68, 146, 70), (13, 10), 7)
+    pygame.draw.circle(s, (92, 174, 88), (11, 8), 4)
 
 
 def _prop_pine(s):
-    pygame.draw.rect(s, (96, 64, 34), (7, 17, 3, 7))
-    pygame.draw.polygon(s, (30, 78, 44), [(8, 0), (1, 14), (15, 14)])
-    pygame.draw.polygon(s, (44, 104, 56), [(8, 3), (3, 14), (13, 14)])
-    pygame.draw.polygon(s, (60, 130, 70), [(8, 6), (4, 13), (12, 13)])
+    """Высокая вековая ель 32x38 px"""
+    pygame.draw.ellipse(s, (20, 35, 22, 95), (5, 30, 22, 7))
+    pygame.draw.rect(s, (88, 56, 30), (14, 25, 4, 10))
+    for y_top, y_bot, half_w, col in (
+        (14, 27, 13, (26, 70, 40)),
+        (8,  21, 11, (36, 92, 50)),
+        (2,  14, 8,  (50, 118, 64)),
+    ):
+        pygame.draw.polygon(s, col, [(16, y_top), (16 - half_w, y_bot), (16 + half_w, y_bot)])
+        pygame.draw.polygon(s, (18, 44, 26), [(16, y_top), (16 - half_w, y_bot), (16 + half_w, y_bot)], 1)
+
+
+def _prop_cave(s):
+    """Массивный скальный вход в подземелье 48x48 px (3x3 тайла) с факелами"""
+    outline = (22, 22, 30)
+    # Скальный холм
+    pygame.draw.polygon(s, (84, 82, 90), [(2, 46), (8, 12), (24, 4), (40, 12), (46, 46)])
+    pygame.draw.polygon(s, (108, 106, 116), [(8, 46), (14, 16), (24, 8), (34, 16), (38, 46)])
+    pygame.draw.polygon(s, outline, [(2, 46), (8, 12), (24, 4), (40, 12), (46, 46)], 2)
+
+    # Каменная арка входа
+    pygame.draw.rect(s, (64, 62, 72), (12, 20, 24, 26))
+    pygame.draw.rect(s, outline, (12, 20, 24, 26), 1)
+    # Темная глубина пещеры
+    pygame.draw.ellipse(s, (12, 12, 18), (15, 22, 18, 28))
+    pygame.draw.ellipse(s, (4, 4, 8), (18, 25, 12, 24))
+
+    # Два горящих факела по бокам от входа
+    for fx in (10, 36):
+        pygame.draw.rect(s, (110, 70, 35), (fx, 30, 2, 10))
+        pygame.draw.circle(s, (240, 95, 30), (fx + 1, 28), 3)
+        pygame.draw.circle(s, (255, 220, 80), (fx + 1, 27), 2)
 
 
 def _prop_cactus(s):
@@ -230,43 +264,74 @@ def _prop_boulder(s):
     pygame.draw.line(s, (56, 54, 56), (2, 15), (14, 15), 1)
 
 
-def _prop_cave(s):
-    """Устье пещеры: скальная арка с тёмным проходом (высота 24)."""
-    pygame.draw.rect(s, (88, 86, 92), (0, 6, 16, 18))
-    pygame.draw.rect(s, (70, 68, 76), (0, 18, 16, 6))
-    pygame.draw.ellipse(s, (10, 10, 16), (3, 6, 10, 16))
-    pygame.draw.ellipse(s, (4, 4, 8), (5, 8, 6, 12))
-    pygame.draw.line(s, (120, 118, 124), (1, 7), (15, 7), 1)
-    s.set_at((2, 20), (58, 56, 62))
-    s.set_at((13, 21), (58, 56, 62))
+def _make_city_fortress(size="town"):
+    """Монументальный город-крепость 112x80 px (7x5 тайлов): донжон, дома, бастионы и ворота."""
+    w, h = 112, 80
+    s = pygame.Surface((w, h), pygame.SRCALPHA)
+    outline = (22, 22, 30)
 
+    # 1. Центральный донжон (цитадель на заднем плане)
+    pygame.draw.rect(s, (128, 134, 146), (42, 8, 28, 36))
+    pygame.draw.rect(s, outline, (42, 8, 28, 36), 1)
+    pygame.draw.polygon(s, (58, 92, 158), [(40, 8), (56, 0), (72, 8)])
+    pygame.draw.polygon(s, outline, [(40, 8), (56, 0), (72, 8)], 1)
 
-def _prop_gate(s):
-    """Ворота города: каменные столбы, перекладина, знамя (высота 24)."""
-    # Знамя между столбами
-    pygame.draw.rect(s, (60, 90, 160), (4, 2, 8, 7))
-    pygame.draw.rect(s, (240, 214, 96), (7, 4, 2, 3))
-    # Перекладина
-    pygame.draw.rect(s, (128, 124, 118), (0, 8, 16, 4))
-    pygame.draw.rect(s, (94, 90, 86), (0, 11, 16, 1))
-    # Столбы
-    pygame.draw.rect(s, (140, 136, 130), (0, 12, 4, 12))
-    pygame.draw.rect(s, (140, 136, 130), (12, 12, 4, 12))
-    pygame.draw.rect(s, (104, 100, 96), (3, 12, 1, 12))
-    pygame.draw.rect(s, (104, 100, 96), (11, 12, 1, 12))
-    pygame.draw.rect(s, (84, 80, 78), (0, 22, 4, 2))
-    pygame.draw.rect(s, (84, 80, 78), (12, 22, 4, 2))
-    # Проём между столбами (тёмная тень)
-    pygame.draw.rect(s, (46, 52, 44), (4, 16, 8, 8))
+    # 2. Квартал городских домов с разными крышами внутри стен
+    houses = [
+        (16, 22, 24, 18, (192, 78, 54)),
+        (72, 20, 24, 20, (64, 124, 72)),
+        (24, 30, 22, 16, (212, 175, 85)),
+        (66, 30, 22, 16, (185, 85, 65)),
+    ]
+    for rx, ry, rw, rh, roof_col in houses:
+        pygame.draw.rect(s, (220, 210, 185), (rx + 2, ry + 8, rw - 4, rh - 8))
+        pygame.draw.rect(s, roof_col, (rx, ry, rw, 10))
+        pygame.draw.rect(s, outline, (rx, ry, rw, rh), 1)
 
+    # 3. Внешняя крепостная стена с зубцами
+    wall_y, wall_h = 44, 32
+    pygame.draw.rect(s, (138, 142, 152), (8, wall_y, w - 16, wall_h))
+    pygame.draw.rect(s, (96, 100, 112), (8, wall_y + wall_h - 6, w - 16, 6))
+    pygame.draw.rect(s, outline, (8, wall_y, w - 16, wall_h), 1)
+    for bx in range(18, w - 20, 7):
+        pygame.draw.rect(s, (152, 156, 166), (bx, wall_y - 4, 5, 4))
+        pygame.draw.rect(s, outline, (bx, wall_y - 4, 5, 4), 1)
+
+    # 4. Четыре дозорные башни (2 у ворот и 2 по краям крепости)
+    for tx, ty, tw, th in ((2, 30, 14, 48), (w - 16, 30, 14, 48), (36, 34, 12, 44), (w - 48, 34, 12, 44)):
+        pygame.draw.rect(s, (124, 128, 140), (tx, ty, tw, th))
+        pygame.draw.rect(s, (92, 96, 108), (tx + tw - 4, ty, 4, th))
+        pygame.draw.rect(s, outline, (tx, ty, tw, th), 1)
+        pygame.draw.polygon(s, (65, 95, 155), [(tx - 1, ty), (tx + tw // 2, ty - 10), (tx + tw, ty)])
+        pygame.draw.polygon(s, outline, [(tx - 1, ty), (tx + tw // 2, ty - 10), (tx + tw, ty)], 1)
+        pygame.draw.line(s, outline, (tx + tw // 2, ty - 15), (tx + tw // 2, ty - 10), 1)
+        pygame.draw.rect(s, (235, 185, 55), (tx + tw // 2 + 1, ty - 15, 6, 4))
+
+    # 5. Массивные центральные ворота с гербом
+    gx = w // 2 - 10
+    pygame.draw.rect(s, (88, 92, 102), (gx - 2, wall_y + 6, 24, 26))
+    pygame.draw.rect(s, (42, 32, 26), (gx, wall_y + 8, 20, 24))
+    for lx in range(gx + 4, gx + 18, 4):
+        pygame.draw.line(s, (115, 78, 44), (lx, wall_y + 8), (lx, wall_y + 31), 1)
+    pygame.draw.line(s, (115, 78, 44), (gx, wall_y + 15), (gx + 19, wall_y + 15), 1)
+    pygame.draw.line(s, (115, 78, 44), (gx, wall_y + 23), (gx + 19, wall_y + 23), 1)
+    pygame.draw.rect(s, outline, (gx - 2, wall_y + 6, 24, 26), 1)
+    # Гербовый щит над воротами
+    pygame.draw.rect(s, (55, 88, 165), (w // 2 - 4, wall_y, 8, 6))
+    pygame.draw.rect(s, (245, 210, 75), (w // 2 - 2, wall_y + 1, 4, 4))
+
+    return s
 
 def _make_prop(kind):
+    if kind == "gate":
+        return _make_city_fortress()
+    sizes = {"tree": (32, 36), "pine": (32, 38), "cave": (48, 48)}
+    w, h = sizes.get(kind, (16, 24))
     fns = {
         "tree": _prop_tree, "pine": _prop_pine, "cactus": _prop_cactus,
         "bush": _prop_bush, "boulder": _prop_boulder, "cave": _prop_cave,
-        "gate": _prop_gate,
     }
-    return _tile(fns[kind])
+    return _tile(fns[kind], w=w, h=h)
 
 
 def ensure_world_sprites(sprites):
@@ -359,51 +424,65 @@ _TRANSITION_DEPTH = 5          # ширина полосы сглаживани�
 _TRANSITION_SPRITES = {}       # (класс, направление) -> Surface
 
 
-def _make_transition(color, direction, seed):
-    """Оверлей 16x16: цвет соседней поверхности, «вытекающий» в тайл с края
-    (ребро) или из угла (диагональ), с дизерингом для органичной границы."""
+def _make_transition_mask(color, mask, seed):
+    """Генерирует единый 16x16 оверлей по 8-битной маске соседей:
+    биты: 0=N, 1=E, 2=S, 3=W, 4=NW, 5=NE, 6=SW, 7=SE.
+    Углы рисуются строго с правильным скруглением без двойного наложения."""
     s = pygame.Surface((16, 16), pygame.SRCALPHA)
     rnd = random.Random(seed)
     cr, cg, cb = color
-    d = _TRANSITION_DEPTH
-    # Угловые пятна чуть шире рёбер: диагональ «длиннее» ребра тайла
-    corner_r = _TRANSITION_DEPTH + 2
-    corner_at = {"nw": (0.0, 0.0), "ne": (15.0, 0.0),
-                 "sw": (0.0, 15.0), "se": (15.0, 15.0)}
+    d = float(_TRANSITION_DEPTH)
+
+    has_n = bool(mask & 1)
+    has_e = bool(mask & 2)
+    has_s = bool(mask & 4)
+    has_w = bool(mask & 8)
+    has_nw = bool(mask & 16)
+    has_ne = bool(mask & 32)
+    has_sw = bool(mask & 64)
+    has_se = bool(mask & 128)
+
     for y in range(16):
         for x in range(16):
-            if direction in corner_at:
-                cx, cy = corner_at[direction]
-                dist = math.hypot(x - cx, y - cy)
-                if dist >= corner_r:
-                    continue
-                a = 255.0 * (1.0 - dist / corner_r)
-            else:
-                if direction == "n":
-                    dist = y
-                elif direction == "s":
-                    dist = 15 - y
-                elif direction == "w":
-                    dist = x
-                else:  # "e"
-                    dist = 15 - x
-                if dist >= d:
-                    continue
-                a = 255.0 * (1.0 - dist / d)
-            a += rnd.randint(-70, 10)   # шум кромки
-            if a <= 8:
+            min_dist = 99.0
+            if has_n:
+                min_dist = min(min_dist, float(y))
+            if has_s:
+                min_dist = min(min_dist, float(15 - y))
+            if has_w:
+                min_dist = min(min_dist, float(x))
+            if has_e:
+                min_dist = min(min_dist, float(15 - x))
+
+            # Внешние диагональные углы (рисуются плавным радиусом, если не перекрыты ребрами)
+            if has_nw and not (has_n and has_w):
+                min_dist = min(min_dist, math.hypot(x, y))
+            if has_ne and not (has_n and has_e):
+                min_dist = min(min_dist, math.hypot(15 - x, y))
+            if has_sw and not (has_s and has_w):
+                min_dist = min(min_dist, math.hypot(x, 15 - y))
+            if has_se and not (has_s and has_e):
+                min_dist = min(min_dist, math.hypot(15 - x, 15 - y))
+
+            if min_dist >= d:
+                continue
+
+            a = 240.0 * (1.0 - min_dist / d)
+            a += rnd.randint(-55, 12)
+            if a <= 10:
                 continue
             s.set_at((x, y), (cr, cg, cb, min(255, int(a))))
     return s
 
 
-def get_transition_sprite(cls, direction):
-    key = (cls, direction)
+def get_transition_sprite(cls, mask):
+    key = (cls, mask)
     spr = _TRANSITION_SPRITES.get(key)
     if spr is None:
-        spr = _make_transition(TRANSITION_COLORS[cls], direction, f"{cls}_{direction}")
+        spr = _make_transition_mask(TRANSITION_COLORS[cls], mask, f"{cls}_{mask}")
         _TRANSITION_SPRITES[key] = spr
     return spr
+
 
 
 class WorldProp:
@@ -444,42 +523,45 @@ class GeneratedWorld(WorldMap):
         generate_overworld(self)
 
     def draw_ground_overlays(self, surface, camera):
-        """Плавные переходы: цвет соседней поверхности вытекает в край тайла
-        (рёбра) и в углы (диагональные соседи)."""
+        """Плавные 8-сторонние переходы биомов и дорог с учетом всех углов."""
         start_c = max(0, camera.offset_x // TILE_SIZE)
         end_c = min(self.cols, (camera.offset_x + NATIVE_WIDTH) // TILE_SIZE + 2)
         start_r = max(0, camera.offset_y // TILE_SIZE)
         end_r = min(self.rows, (camera.offset_y + NATIVE_HEIGHT) // TILE_SIZE + 2)
 
-        dirs = ((0, -1, "n"), (0, 1, "s"), (-1, 0, "w"), (1, 0, "e"))
-        diag_dirs = ((-1, -1, "nw"), (1, -1, "ne"), (-1, 1, "sw"), (1, 1, "se"))
+        neighbors = (
+            (0, -1, 1), (1, 0, 2), (0, 1, 4), (-1, 0, 8),
+            (-1, -1, 16), (1, -1, 32), (-1, 1, 64), (1, 1, 128)
+        )
+
         for r in range(start_r, end_r):
             for c in range(start_c, end_c):
                 cls = BLEND_TILES.get(self.tiles[r][c])
                 if cls is None:
                     continue
                 my_rank = BIOME_RANK[cls]
-                x = c * TILE_SIZE - camera.offset_x
-                y = r * TILE_SIZE - camera.offset_y
-                # Собираем кандидатов и рисуем по возрастанию ранга: более
-                # «высокий» сосед перекрывает более низкий (и в углах тоже).
-                candidates = []
-                for dc, dr, direction in dirs + diag_dirs:
+
+                # Группируем битовые маски по классам более «высоких» соседей
+                masks_by_cls = {}
+                for dc, dr, bit in neighbors:
                     nc, nr = c + dc, r + dr
                     if not (0 <= nc < self.cols and 0 <= nr < self.rows):
                         continue
                     n_cls = BLEND_TILES.get(self.tiles[nr][nc])
                     if n_cls is None or n_cls == cls:
                         continue
-                    n_rank = BIOME_RANK[n_cls]
-                    # Более «низкая» поверхность уступает: её край перекрывается
-                    # цветом соседа (пляж разливается по траве и т.п.)
-                    if n_rank <= my_rank:
+                    if BIOME_RANK[n_cls] <= my_rank:
                         continue
-                    candidates.append((n_rank, get_transition_sprite(n_cls, direction)))
-                candidates.sort(key=lambda item: item[0])
-                for _, spr in candidates:
-                    surface.blit(spr, (x, y))
+                    masks_by_cls[n_cls] = masks_by_cls.get(n_cls, 0) | bit
+
+                if not masks_by_cls:
+                    continue
+
+                x = c * TILE_SIZE - camera.offset_x
+                y = r * TILE_SIZE - camera.offset_y
+                for n_cls in sorted(masks_by_cls.keys(), key=lambda k: BIOME_RANK[k]):
+                    surface.blit(get_transition_sprite(n_cls, masks_by_cls[n_cls]), (x, y))
+
 
     def biome_name_at(self, px, py):
         c = int(px) // TILE_SIZE
@@ -774,17 +856,17 @@ def _build_city(world, rng, idx, c, r, radius):
     world.cities.append(city)
 
     # Ворота-арка в центре площади — вход в отдельную локацию города
-    spr = _GLOBAL_SPRITES.get("gate")
-    if spr is None:
-        spr = _make_prop("gate")
-    h = spr.get_height()
-    rect = pygame.Rect(c * TILE_SIZE, r * TILE_SIZE + TILE_SIZE - h,
-                       spr.get_width(), h)
-    door = pygame.Rect(c * TILE_SIZE, r * TILE_SIZE, TILE_SIZE, TILE_SIZE)
-    gate = WorldProp(f"gate_{idx}", "city_gate", f"Ворота: {name}",
-                     rect, spr, [], door_rect=door,
+    spr = _make_city_fortress(size)
+    fw, fh = spr.get_width(), spr.get_height()
+    rect = pygame.Rect((c - 3) * TILE_SIZE - 8, (r - 4) * TILE_SIZE, fw, fh)
+    wall_left = pygame.Rect(rect.x + 4, rect.y + 36, 40, 42)
+    wall_right = pygame.Rect(rect.right - 44, rect.y + 36, 40, 42)
+    door = pygame.Rect(rect.centerx - 12, rect.bottom - 12, 24, 16)
+    gate = WorldProp(f"gate_{idx}", "city_gate", f"Город {name}",
+                     rect, spr, [wall_left, wall_right], door_rect=door,
                      meta={"city_idx": idx, "size": size, "name": name})
     world.buildings.append(gate)
+
 
     # Дорожки от площади к краям города (к воротам ведут дороги)
     def lay_road(rr, cc):
@@ -882,8 +964,9 @@ def _scatter_decor(world, sprites, rng):
             rect = pygame.Rect(c * TILE_SIZE, r * TILE_SIZE + TILE_SIZE - h,
                                spr.get_width(), h)
             # Непроходим только ствол/основание
-            trunk = pygame.Rect(c * TILE_SIZE + 4, r * TILE_SIZE + TILE_SIZE - 8,
-                                8, 8)
+            trunk_x = rect.centerx - 4
+            trunk = pygame.Rect(trunk_x, r * TILE_SIZE + TILE_SIZE - 8, 8, 8)
+
             p = WorldProp(f"prop_{kind}_{tree_id}", kind, kind, rect, spr, [trunk])
             props.append(p)
             tree_id += 1
@@ -907,14 +990,14 @@ def _scatter_decor(world, sprites, rng):
 
     for i, (c, r) in enumerate(cave_spots):
         spr = sprites.get("cave")
-        h = spr.get_height()
-        rect = pygame.Rect(c * TILE_SIZE, r * TILE_SIZE + TILE_SIZE - h,
-                           spr.get_width(), h)
-        door = pygame.Rect(c * TILE_SIZE, (r + 1) * TILE_SIZE, TILE_SIZE, TILE_SIZE)
+        fw, fh = spr.get_width(), spr.get_height()
+        rect = pygame.Rect((c - 1) * TILE_SIZE, (r - 2) * TILE_SIZE, fw, fh)
+        door = pygame.Rect(rect.centerx - 10, rect.bottom - 6, 20, 16)
         meta = {"depth": i + 1, "cave_c": c, "cave_r": r}
         p = WorldProp(f"cave_{i}", "cave", "Пещера", rect, spr,
-                      [pygame.Rect(c * TILE_SIZE, r * TILE_SIZE, TILE_SIZE, TILE_SIZE)],
+                      [pygame.Rect(rect.x + 4, rect.y + 16, fw - 8, fh - 18)],
                       door_rect=door, meta=meta)
+
         props.append(p)
         world.dungeon_entrances.append({"c": c, "r": r, "id": p.id, "depth": i + 1})
 
@@ -1096,9 +1179,8 @@ class CityLocation(WorldMap):
 
 
 CITY_LOCATION_SIZES = {
-    "big": (48, 32), "town": (38, 26), "village": (28, 20),
+    "big": (64, 44), "town": (52, 36), "village": (40, 28),
 }
-
 
 def generate_city(city, sprites, return_pos, db=None, rng=None):
     """Генерирует отдельную локацию города: площадь, здания, жители, выход.
@@ -1258,8 +1340,8 @@ class DungeonRoom(WorldMap):
 
 
 def generate_dungeon(depth=1, return_pos=(0, 0), sprites=None, db=None,
-                     rng=None, size=28):
-    """Генерирует карту подземелья с лестницей-выходом и комнатами."""
+                     rng=None, size=42):
+    """Генерирует просторную карту подземелья с залами, широкими коридорами и выходом."""
     from entities import Entity
     from components.inventory import Inventory
     from components.stats import Stats
@@ -1270,7 +1352,7 @@ def generate_dungeon(depth=1, return_pos=(0, 0), sprites=None, db=None,
     from monster_gen import generate_monster
 
     rng = rng or random.Random()
-    cols, rows = size, int(size * 0.65)
+    cols, rows = size, int(size * 0.72)
     room = DungeonRoom(depth, cols, rows, return_pos, sprites or {})
     tiles = room.tiles
 
@@ -1279,28 +1361,30 @@ def generate_dungeon(depth=1, return_pos=(0, 0), sprites=None, db=None,
         for c in range(cols):
             tiles[r][c] = "wall"
 
-    # Комнаты
+    # Просторные залы (от 5x4 до 10x8 тайлов)
     rooms = []
-    for _ in range(6 + depth * 2):
-        w = rng.randint(4, 8)
-        h = rng.randint(3, 6)
-        rc = rng.randint(1, cols - w - 2)
-        rr = rng.randint(1, rows - h - 2)
+    for _ in range(8 + depth * 2):
+        w = rng.randint(5, 10)
+        h = rng.randint(4, 8)
+        rc = rng.randint(2, cols - w - 3)
+        rr = rng.randint(2, rows - h - 3)
         rooms.append((rc, rr, w, h))
         for r in range(rr, rr + h):
             for c in range(rc, rc + w):
                 tiles[r][c] = "cave_floor"
 
-    # Коридоры между центрами комнат (по порядку)
+    # Широкие 2-тайловые коридоры между центрами залов
     centers = [(rc + w // 2, rr + h // 2) for rc, rr, w, h in rooms]
     for i in range(len(centers) - 1):
         (c1, r1), (c2, r2) = centers[i], centers[i + 1]
         for c in range(min(c1, c2), max(c1, c2) + 1):
-            if 0 < r1 < rows - 1 and tiles[r1][c] == "wall":
-                tiles[r1][c] = "cave_floor"
+            for off in (0, 1):
+                if 1 <= r1 + off < rows - 2 and tiles[r1 + off][c] == "wall":
+                    tiles[r1 + off][c] = "cave_floor"
         for r in range(min(r1, r2), max(r1, r2) + 1):
-            if 0 < c2 < cols - 1 and tiles[r][c2] == "wall":
-                tiles[r][c2] = "cave_floor"
+            for off in (0, 1):
+                if 1 <= c2 + off < cols - 2 and tiles[r][c2 + off] == "wall":
+                    tiles[r][c2 + off] = "cave_floor"
 
     # Стартовая позиция — центр первой комнаты, к ней же тянется коридор к выходу
     if centers:
